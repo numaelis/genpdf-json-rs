@@ -1,0 +1,1262 @@
+use rckive_genpdf::{
+    elements, fonts, style, PaperSize, Margins, Alignment, Element, elements::{Paragraph, IntoBoxedElement, Text, PaddedElement, TableLayout, FrameCellDecorator, LinearLayout, OrderedList, UnorderedList, BulletPoint, Break, PageBreak, Image},
+};
+
+use rckive_genpdf::fonts::{FontFamily, Font, FontData};
+
+use rckive_genpdf::error::{Error};
+use std::path;
+use std::fs;
+
+use serde_json::{json, Value};
+use std::{collections::HashMap};
+
+type PdfDocument = rckive_genpdf::Document;
+
+struct GenpdfJson {
+    doc: rckive_genpdf::Document,
+    alignment_map: HashMap<String, Alignment>,    
+    font_cache: HashMap<String, FontFamily<Font>>,
+}
+
+pub trait RootLayout {
+    fn push<E: IntoBoxedElement>(&mut self, element: E) -> ();
+    fn push_row(&mut self, row: Vec<Box<dyn Element>>) -> Result<(), Error>;
+    fn push_cell(&mut self, cell: Box<dyn Element>) -> ();
+    fn push_static<E: Element + 'static>(&mut self, element: E);
+    fn type_name(&self) -> &'static str;
+}
+
+struct LLayout{
+    root: elements::LinearLayout,    
+}
+
+struct TLayout{
+    root: elements::TableLayout,    
+}
+
+struct ULayout{
+    root: elements::UnorderedList,    
+}
+
+struct OLayout{
+    root: elements::OrderedList,    
+}
+
+struct VecLayout{
+    root: Vec<Box<dyn Element>>
+}
+
+struct NoneLayout{
+    root: i8,    
+}
+
+impl RootLayout for LLayout{
+    fn push<E: IntoBoxedElement>(&mut self, element: E) {
+        self.root.push(element);
+    }
+    fn push_row(&mut self, _row: Vec<Box<dyn Element>>) -> Result<(), Error> {
+        Ok(())
+    }
+    fn push_static<E: Element + 'static>(&mut self, _element: E){}
+    fn push_cell(&mut self, _cell: Box<dyn Element>){}
+    fn type_name(&self) -> &'static str {
+        "LinearLayout"
+    }
+}
+
+impl RootLayout for TLayout{
+    fn push<E: IntoBoxedElement>(&mut self, _element: E) {        
+    }
+    fn push_row(&mut self, row: Vec<Box<dyn Element>>) -> Result<(), Error> {
+        let _ = self.root.push_row(row);
+        Ok(())
+    }
+    fn push_cell(&mut self, _cell: Box<dyn Element>){}
+    fn push_static<E: Element + 'static>(&mut self, _element: E){}
+    fn type_name(&self) -> &'static str {
+        "TableLayout"
+    }
+}
+
+impl RootLayout for ULayout{
+    fn push<E: IntoBoxedElement>(&mut self, _element: E) {        
+    }
+    fn push_row(&mut self, _row: Vec<Box<dyn Element>>) -> Result<(), Error> {
+        Ok(())
+    }
+    fn push_cell(&mut self, _cell: Box<dyn Element>){}
+    fn push_static<E: Element + 'static>(&mut self, element: E){
+        self.root.push(element);
+    }
+    fn type_name(&self) -> &'static str {
+        "StaticList"
+    }
+}
+
+impl RootLayout for OLayout{
+    fn push<E: IntoBoxedElement>(&mut self, _element: E) {        
+    }
+    fn push_row(&mut self, _row: Vec<Box<dyn Element>>) -> Result<(), Error> {
+        Ok(())
+    }
+    fn push_cell(&mut self, _cell: Box<dyn Element>){}
+    fn push_static<E: Element + 'static>(&mut self, element: E){
+        self.root.push(element);
+    }
+    fn type_name(&self) -> &'static str {
+        "StaticList"
+    }
+}
+
+impl RootLayout for VecLayout{
+    fn push<E: IntoBoxedElement>(&mut self, _element: E) {        
+    }
+    fn push_row(&mut self, _row: Vec<Box<dyn Element>>) -> Result<(), Error> {
+        Ok(())
+    }
+    fn push_cell(&mut self, cell: Box<dyn Element>){
+        self.root.push(cell);
+    }
+    fn push_static<E: Element + 'static>(&mut self, _element: E){}
+    fn type_name(&self) -> &'static str {
+        "VecLayout"
+    }
+}
+
+impl RootLayout for NoneLayout{
+    fn push<E: IntoBoxedElement>(&mut self, _element: E) {        
+    }
+    fn push_row(&mut self, _row: Vec<Box<dyn Element>>) -> Result<(), Error> {
+        Ok(())
+    }
+    fn push_cell(&mut self, _cell: Box<dyn Element>){}
+    fn push_static<E: Element + 'static>(&mut self, _element: E){}
+    fn type_name(&self) -> &'static str {
+        "NoneLayout"
+    }
+}
+
+fn get_font_default(json_config: &serde_json::Value) -> Result<FontFamily<FontData>, String> {
+    if let Some(default_font) = json_config.get("default_font").and_then(|v| v.as_object()) {            
+        if let Some(font_family_name) = default_font.get("font_family_name").and_then(|v| v.as_str()) { 
+            if let Some(dir) = default_font.get("dir").and_then(|v| v.as_str()) { 
+                let font_family = fonts::from_files(dir, font_family_name, None)
+                                    .expect("Failed to load the font family");  
+                return Ok(font_family);
+            }
+        }                            
+    }
+    Err("error default font".to_string())
+    /*let boxed_str: Box<&str> = Box::new("An error occurred");
+    let error_message: String = boxed_str.to_string();
+    let boxed_error: Box<dyn std::error::Error> = error_message.into();
+    Err(boxed_error)*/     
+}
+
+fn get_color(val_color: &serde_json::Value) -> style::Color {
+    let mut mcolor = style::Color::Rgb(0,0,0);
+    if let Some(ctype) = val_color.get("type").and_then(|v| v.as_str()) {
+        match ctype {
+            "rgb" => {
+            if let Some(value) = val_color.get("value").and_then(|v| v.as_array()) {
+                if value.len() == 3 {
+                    mcolor = style::Color::Rgb(value[0].as_f64().unwrap_or(0.0) as u8, 
+                                                    value[1].as_f64().unwrap_or(0.0) as u8, 
+                                                    value[2].as_f64().unwrap_or(0.0) as u8);
+                    }
+                }
+            }
+            
+            "cmyk" => {
+                if let Some(value) = val_color.get("value").and_then(|v| v.as_array()) {
+                    if value.len() == 4 {
+                        mcolor = style::Color::Cmyk(value[0].as_f64().unwrap_or(0.0) as u8, 
+                                                        value[1].as_f64().unwrap_or(0.0) as u8, 
+                                                        value[2].as_f64().unwrap_or(0.0) as u8,
+                                                        value[3].as_f64().unwrap_or(0.0) as u8);
+                    }
+                }
+            }                
+            "greyscale" => {
+                if let Some(value) = val_color.get("value").and_then(|v| Some(v.as_f64().unwrap_or(0.0) as u8)) {                        
+                    mcolor = style::Color::Greyscale(value);                            
+                }
+            }
+            &_ => todo!()
+        }
+    }
+    return mcolor;
+}
+     
+fn get_head_style(val_style: &serde_json::Value, font_cache: &HashMap<String, FontFamily<Font>>) -> style::Style {
+    let mut mstyle = style::Style::new();
+                                    
+    if let Some(bold) = val_style.get("bold").and_then(|v| v.as_bool()) {
+        if bold{
+            mstyle.set_bold();
+        }
+    }
+    if let Some(italic) = val_style.get("italic").and_then(|v| v.as_bool()) {
+        if italic{
+            mstyle.set_italic();
+        }
+    }       
+    if let Some(font_family_name) = val_style.get("font_family_name").and_then(|v| v.as_str()) {  
+        if let Some(family) = font_cache.get(font_family_name) {                                        
+            mstyle.set_font_family(*family);
+        }                                                                    
+    }
+    if let Some(size) = val_style.get("size").and_then(|v| Some(v.as_f64().unwrap_or(0.0) as u8)) {
+        mstyle.set_font_size(size);
+    }
+    if let Some(line_spacing) = val_style.get("line_spacing").and_then(|v| Some(v.as_f64().unwrap_or(0.0) as f32)) {
+        mstyle.set_line_spacing(line_spacing);
+    }
+    
+    if let Some(val_color) = val_style.get("color") { 
+            let color = get_color(val_color);
+            mstyle.set_color(color);            
+    }    
+    return mstyle;
+}
+    
+impl GenpdfJson {
+    fn new(json_config: &serde_json::Value) -> Self {        
+        let mut alignment_map = HashMap::new();
+        alignment_map.insert("center".to_string(), Alignment::Center);
+        alignment_map.insert("left".to_string(), Alignment::Left);
+        alignment_map.insert("right".to_string(), Alignment::Right);                       
+        
+        let default_font = get_font_default(&json_config).unwrap();
+        let mut doc = PdfDocument::new(default_font);
+        
+        let mut fcache = HashMap::new();
+        if let Some(fonts) = json_config.get("fonts").and_then(|v| v.as_array()) {
+            for font in fonts {
+                if let Some(font_family_name) = font.get("font_family_name").and_then(|v| v.as_str()) { 
+                    if let Some(dir) = font.get("dir").and_then(|v| v.as_str()) { 
+                        let font_family = fonts::from_files(dir, font_family_name, None)
+                                            .expect("Failed to load the font family");
+                        let family = doc.add_font_family(font_family);
+                        fcache.insert(font_family_name.to_string(), family);                        
+                    }
+                }                
+            }
+        }
+        
+        if let Some(title) = json_config.get("title").and_then(|v| v.as_str()) {            
+            doc.set_title(title);
+        } 
+        doc.set_minimal_conformance();
+        let mut config_line_spacing = 1.25;
+        if let Some(line_spacing) = json_config.get("line_spacing").and_then(|v| Some(v.as_f64().unwrap() as f32)){
+            config_line_spacing = line_spacing
+        }
+        doc.set_line_spacing(config_line_spacing);  
+        
+        let mut decorator = rckive_genpdf::SimplePageDecorator::new();
+        
+        if let Some(margins) = json_config.get("margins").and_then(|v| v.as_array()){
+            let t = margins[0].as_f64().unwrap_or(0.0) as f32;
+            let r = margins[1].as_f64().unwrap_or(0.0) as f32;
+            let b = margins[2].as_f64().unwrap_or(0.0) as f32;
+            let l = margins[3].as_f64().unwrap_or(0.0) as f32;
+            decorator.set_margins(Margins::trbl(t,r,b,l));
+        }else{
+            if let Some(margins) = json_config.get("margins").and_then(|v| Some(v.as_f64().unwrap() as f32)){
+                decorator.set_margins(margins);
+            }
+        }            
+        
+        let mut page_count_text = "".to_string();
+        let mut page_count_alignment = Alignment::Left;
+        let mut page_count_style = style::Style::new();
+        
+        let mut font_size = 9;
+        
+        let mut head_page_text = "".to_string();
+        let mut head_page_alignment = Alignment::Left;
+        let mut head_page_style = style::Style::new();
+                
+        let mut head_element = Paragraph::default();
+        if let Some(head_page) = json_config.get("head_page") {
+            if let Some(alignment) = head_page.get("alignment").and_then(|v| v.as_str()) {
+                head_page_alignment = *alignment_map.get(alignment).unwrap();
+            }             
+            if let Some(value) = head_page.get("value").and_then(|v| v.as_array()) {
+                for val_style in value {      
+                    head_page_style = get_head_style(&val_style, &fcache);                                
+                    if let Some(text) = val_style.get("text").and_then(|v| v.as_str()) {                        
+                        head_page_text = text.to_string();
+                    }                                
+                }
+            }
+        }
+        
+        let mut head_element = Paragraph::default();
+        if let Some(head_page_count) = json_config.get("head_page_count") {
+            if let Some(alignment) = head_page_count.get("alignment").and_then(|v| v.as_str()) {
+                page_count_alignment = *alignment_map.get(alignment).unwrap();
+            }             
+            if let Some(value) = head_page_count.get("value").and_then(|v| v.as_array()) {
+                for val_style in value {      
+                    page_count_style = get_head_style(&val_style, &fcache);                                
+                    if let Some(text) = val_style.get("text").and_then(|v| v.as_str()) {                        
+                        page_count_text = text.to_string();
+                    }                                
+                }
+            }
+        }                
+                
+        if let Some(deafault_font_size) = json_config.get("deafault_font_size").and_then(|v| Some(v.as_f64().unwrap_or(9.0) as u8)) { 
+            font_size = deafault_font_size;
+        }
+               
+        decorator.set_header(move |page| {
+            let mut layout = elements::LinearLayout::vertical();
+            if head_page_text != "".to_string() {
+                layout.push(
+                    elements::Paragraph::new(format!("{} ",head_page_text)).aligned(head_page_alignment).styled(head_page_style),
+                );
+                
+                layout.push(elements::Break::new(1.));
+            }
+            if page > 1 && page_count_text!= "".to_string()  {
+                layout.push(
+                    elements::Paragraph::new(format!("{} {}",page_count_text, page)).aligned(page_count_alignment).styled(page_count_style),
+                );
+                layout.push(elements::Break::new(1.));
+            }
+            layout.styled(style::Style::new())
+        });
+        
+        doc.set_page_decorator(decorator);
+        
+        doc.set_font_size(font_size);                               
+        
+        if let Some(page_size) = json_config.get("page_size").and_then(|v| v.as_array()) { 
+            if page_size.len()>=2 {
+                let width = page_size[0].as_f64().unwrap_or(0.0) as f32;
+                    let height = page_size[1].as_f64().unwrap_or(0.0) as f32;
+                    doc.set_paper_size(rckive_genpdf::Size::new(width, height));
+            }            
+        }else{
+            if let Some(page_size) = json_config.get("page_size").and_then(|v| v.as_str()) { 
+                match page_size {
+                    "A4" => {
+                        doc.set_paper_size(PaperSize::A4);
+                    }
+                    "Legal" => {
+                        doc.set_paper_size(PaperSize::Legal);
+                    }
+                    "Letter" => {
+                        doc.set_paper_size(PaperSize::Letter);
+                    }
+                    _ =>{
+                    }
+                }
+            }
+        }
+                   
+//         #[cfg(feature = "hyphenation")]
+//         {
+//             
+//             use hyphenation::Load;
+// 
+//             doc.set_hyphenator(
+//                 hyphenation::Standard::from_embedded(hyphenation::Language::EnglishUS)
+//                     .expect("Failed to load hyphenation data"),
+//             );
+//         }            
+        
+        GenpdfJson {
+            doc,
+            alignment_map,            
+            font_cache: fcache,
+        }
+    }    
+    
+    
+    fn render_json_file(mut self, json_obj: &serde_json::Value, path: impl AsRef<path::Path>) -> Result<(), Box<dyn std::error::Error>> {
+        self.push_elements(json_obj)?;
+        self.doc.render_to_file(path)?;
+        Ok(())
+    }
+    
+    fn render_json_base64(mut self, json_obj: &serde_json::Value) -> Result<String, Box<dyn std::error::Error>> {
+        self.push_elements(json_obj)?;
+        let bytes = self.doc.render_to_base64()?;
+        Ok(bytes)
+        
+    }
+    
+    fn push_elements(&mut self, json_obj: &serde_json::Value) -> Result<(), Box<dyn std::error::Error>> {
+        if let Some(elements) = json_obj.get("elements").and_then(|v| v.as_array()) {
+            for element in elements {                
+                let mut none_ = NoneLayout{root:0};
+                self.push_element(element, &mut none_)?;
+            }
+        }
+        Ok(())
+    }   
+    
+    fn get_paddings(&self, item_obj: &serde_json::Value) -> Vec<f32> {
+        let mut paddings: Vec<f32> = vec![0.1,0.1,0.1,0.1];
+        if let Some(padding) = item_obj.get("padding").and_then(|v| v.as_array()) {
+            if padding.len()>=4{
+                let t = padding[0].as_f64().unwrap_or(0.0) as f32;
+                let r = padding[1].as_f64().unwrap_or(0.0) as f32;
+                let b = padding[2].as_f64().unwrap_or(0.0) as f32;
+                let l = padding[3].as_f64().unwrap_or(0.0) as f32;
+                paddings.clear();
+                paddings.push(t);
+                paddings.push(r);
+                paddings.push(b);
+                paddings.push(l);                                                                    
+            }
+        }else{
+            if let Some(one_padding) = item_obj.get("padding").and_then(|v| Some(v.as_f64().unwrap_or(0.0) as f32)) {                            
+                    paddings.clear();
+                    paddings.push(one_padding);
+                    paddings.push(one_padding);
+                    paddings.push(one_padding);
+                    paddings.push(one_padding);                                                                                                
+            }
+        }
+        paddings
+    }
+     
+    fn get_style(&self, val_style: &serde_json::Value) -> style::Style {
+        let mut mstyle = style::Style::new();
+                                      
+        if let Some(bold) = val_style.get("bold").and_then(|v| v.as_bool()) {
+            if bold{
+                mstyle.set_bold();
+            }
+        }
+        if let Some(italic) = val_style.get("italic").and_then(|v| v.as_bool()) {
+            if italic{
+                mstyle.set_italic();
+            }
+        }
+        if let Some(font_family_name) = val_style.get("font_family_name").and_then(|v| v.as_str()) {  
+            if let Some(family) = self.font_cache.get(font_family_name) {                                        
+                mstyle.set_font_family(*family);
+            }                                                                    
+        }
+        if let Some(size) = val_style.get("size").and_then(|v| Some(v.as_f64().unwrap_or(0.0) as u8)) {
+            mstyle.set_font_size(size);
+        }
+        if let Some(line_spacing) = val_style.get("line_spacing").and_then(|v| Some(v.as_f64().unwrap_or(0.0) as f32)) {
+            mstyle.set_line_spacing(line_spacing);
+        }
+        
+        if let Some(val_color) = val_style.get("color") {       //.and_then(|v| v.as_object())
+                let color = get_color(val_color);
+                mstyle.set_color(color);            
+        }    
+        return mstyle;
+    }
+    
+    fn match_text_paragraph<T: RootLayout, U: rckive_genpdf::Element + 'static>(&mut self,  element:U, root_layout: &mut T, 
+                                                                                has_frame: bool, frame_thickness: f32, frame_color: style::Color,
+                                                                                bullet: &str) -> Result<(), Box<dyn std::error::Error>> {
+        match root_layout.type_name(){
+            "NoneLayout" =>{
+                if bullet != "" {
+                    if has_frame{
+                        let nlayout = elements::FramedElement::with_line_style(element,
+                                                                                style::LineStyle::new()
+                                                                                .with_thickness(frame_thickness)
+                                                                                .with_color(frame_color));
+                        self.doc.push(BulletPoint::new(nlayout).with_bullet(bullet));                                     
+                    }else{
+                        self.doc.push(BulletPoint::new(element).with_bullet(bullet)); 
+                    }                                                                        
+                }else{
+                    if has_frame{
+                        let nlayout = elements::FramedElement::with_line_style(element,
+                                                                                style::LineStyle::new()
+                                                                                .with_thickness(frame_thickness)
+                                                                                .with_color(frame_color));
+                        self.doc.push(nlayout);                                     
+                    }else{
+                        self.doc.push(element);
+                    }                                    
+                } 
+            }
+            "StaticList" =>{
+                if bullet != "" {
+                    if has_frame{
+                        let nlayout = elements::FramedElement::with_line_style(element,
+                                                                                style::LineStyle::new()
+                                                                                .with_thickness(frame_thickness)
+                                                                                .with_color(frame_color));
+                        root_layout.push_static(BulletPoint::new(nlayout).with_bullet(bullet));                                     
+                    }else{
+                        root_layout.push_static(BulletPoint::new(element).with_bullet(bullet));
+                    }                                      
+                }else{
+                    if has_frame{
+                        let nlayout = elements::FramedElement::with_line_style(element,
+                                                                                style::LineStyle::new()
+                                                                                .with_thickness(frame_thickness)
+                                                                                .with_color(frame_color));
+                        root_layout.push_static(nlayout);                                      
+                    }else{
+                        root_layout.push_static(element);
+                    }                                      
+                }                                
+            }
+            "TableLayout" =>{
+                //
+            }  
+            "VecLayout" =>{
+                if bullet != "" {                                    
+                    if has_frame{
+                        let nlayout = elements::FramedElement::with_line_style(element,
+                                                                                style::LineStyle::new()
+                                                                                .with_thickness(frame_thickness)
+                                                                                .with_color(frame_color));
+                        root_layout.push_cell(Box::new(BulletPoint::new(nlayout).with_bullet(bullet)));                                      
+                    }else{
+                        root_layout.push_cell(Box::new(BulletPoint::new(element).with_bullet(bullet)));
+                    }
+                }else{
+                    if has_frame{
+                        let nlayout = elements::FramedElement::with_line_style(element,
+                                                                                style::LineStyle::new()
+                                                                                .with_thickness(frame_thickness)
+                                                                                .with_color(frame_color));
+                        root_layout.push_cell(Box::new(nlayout));                                        
+                    }else{
+                        root_layout.push_cell(Box::new(element));
+                    }                                      
+                }                                
+            }
+            _ => {
+                if bullet != "" {
+                    if has_frame{
+                        let nlayout = elements::FramedElement::with_line_style(element,
+                                                                                style::LineStyle::new()
+                                                                                .with_thickness(frame_thickness)
+                                                                                .with_color(frame_color));
+                        root_layout.push(BulletPoint::new(nlayout).with_bullet(bullet));                                              
+                    }else{
+                        root_layout.push(BulletPoint::new(element).with_bullet(bullet));       
+                    }                                                                       
+                }else{
+                    if has_frame{
+                        let nlayout = elements::FramedElement::with_line_style(element,
+                                                                                style::LineStyle::new()
+                                                                                .with_thickness(frame_thickness)
+                                                                                .with_color(frame_color));
+                        root_layout.push(nlayout);                                        
+                    }else{
+                        root_layout.push(element);
+                    }                                    
+                }
+            }
+        }                        
+        Ok(())
+    }   
+    
+    fn push_element<T: RootLayout>(&mut self,  item_obj: &serde_json::Value, root_layout: &mut T) -> Result<(), Box<dyn std::error::Error>> {
+        
+            if let Some(etype) = item_obj.get("type").and_then(|v| v.as_str()){
+                match etype{
+                    "layout" => {
+                        if let Some(orientation) = item_obj.get("orientation").and_then(|v| v.as_str()) {
+                            if orientation == "vertical" {
+                                
+                                let mut mstyle = style::Style::new();
+                                if let Some(style) = item_obj.get("style") {
+                                    mstyle = self.get_style(&style);                                       
+                                }
+                                let mut _layout = LinearLayout::vertical();
+                                let mut layout = LLayout{root:_layout};
+                                if let Some(elements) = item_obj.get("elements").and_then(|v| v.as_array()) {
+                                    for element in elements {
+                                        self.push_element(element, &mut layout)?;
+                                    }                                    
+                                }
+                                
+                                let mut has_frame = false;
+                                let mut frame_thickness = 0.1;
+                                let mut frame_color = style::Color::Rgb(0,0,0);
+                                if let Some(frame) = item_obj.get("frame").and_then(|v| v.as_object()) {
+                                    if let Some(thickness)= frame.get("thickness").and_then(|v| Some(v.as_f64().unwrap_or(0.0) as f32)){
+                                        frame_thickness = thickness;
+                                    }
+                                    if let Some(color) = frame.get("color"){
+                                        frame_color = get_color(color);
+                                    }
+                                    has_frame = true
+                                }
+                                let nlayout = layout.root.styled(mstyle);
+                                let paddings = self.get_paddings(item_obj);                        
+                                let nlayout = PaddedElement::new(
+                                    nlayout,
+                                    Margins::trbl(paddings[0], paddings[1], paddings[2], paddings[3]),
+                                ); 
+                                match root_layout.type_name(){
+                                    "NoneLayout" =>{ 
+                                        if has_frame{                                            
+                                            let nlayout = elements::FramedElement::with_line_style(nlayout,
+                                                                                                   style::LineStyle::new()
+                                                                                                   .with_thickness(frame_thickness)
+                                                                                                   .with_color(frame_color));                                            
+                                            self.doc.push(nlayout);
+                                        }else{
+                                            self.doc.push(nlayout);
+                                        }
+                                    }
+                                    "StaticList" =>{
+                                        if has_frame{
+                                            let nlayout = elements::FramedElement::with_line_style(nlayout,
+                                                                                                   style::LineStyle::new()
+                                                                                                   .with_thickness(frame_thickness)
+                                                                                                   .with_color(frame_color));
+                                            root_layout.push_static(nlayout);
+                                        }else{
+                                            root_layout.push_static(nlayout);
+                                        }
+                                        
+                                    }
+                                    "TableLayout" =>{
+                                        // not used
+                                    }   
+                                    "VecLayout" =>{
+                                        if has_frame{
+                                            let nlayout = elements::FramedElement::with_line_style(nlayout,
+                                                                                                   style::LineStyle::new()
+                                                                                                   .with_thickness(frame_thickness)
+                                                                                                   .with_color(frame_color));
+                                            root_layout.push_cell(Box::new(nlayout));
+                                        }else{
+                                            root_layout.push_cell(Box::new(nlayout));
+                                        }                                        
+                                    }
+                                    _ => {
+                                        if has_frame{
+                                            let nlayout = elements::FramedElement::with_line_style(nlayout,
+                                                                                                   style::LineStyle::new()
+                                                                                                   .with_thickness(frame_thickness)
+                                                                                                   .with_color(frame_color));
+                                            root_layout.push(nlayout);
+                                        }else{
+                                            root_layout.push(nlayout);
+                                        }
+                                        
+                                    }
+                                }                                                                                              
+                            }else if orientation == "horizontal"{
+                                if let Some(column_weights) = item_obj.get("column_weights").and_then(|v| v.as_array()) {
+                                    if column_weights.len() > 0 {                                        
+                                        let usize_values: Vec<usize> = column_weights
+                                            .into_iter()
+                                            .filter_map(|val| {
+                                                if let serde_json::Value::Number(num) = val {
+                                                    num.as_u64().and_then(|n| Some(n as usize))
+                                                } else {
+                                                    None
+                                                }
+                                            })
+                                            .collect();
+                                        let mut mstyle = style::Style::new();
+                                        if let Some(style) = item_obj.get("style") {
+                                            mstyle = self.get_style(&style);                                       
+                                        }
+                                        let mut _horizontal_layout = TableLayout::new(usize_values);
+                                        _horizontal_layout.set_cell_decorator(FrameCellDecorator::new(false,false,false));  
+                                        
+                                        let mut frame_thickness = 0.1;
+                                        let mut frame_color = style::Color::Rgb(0,0,0);
+                                        if let Some(frame) = item_obj.get("frame").and_then(|v| v.as_object()) {
+                                            if let Some(thickness)= frame.get("thickness").and_then(|v| Some(v.as_f64().unwrap_or(0.0) as f32)){
+                                                frame_thickness = thickness;
+                                            }
+                                            if let Some(color) = frame.get("color"){
+                                                frame_color = get_color(color);
+                                            }
+                                            _horizontal_layout.set_cell_decorator(FrameCellDecorator::with_line_style(false,true,false, 
+                                                                                                                        style::LineStyle::new()
+                                                                                                                        .with_thickness(frame_thickness)
+                                                                                                                        .with_color(frame_color)));
+                                        }                                        
+                                        let mut horizontal_layout = TLayout{root:_horizontal_layout};
+                                        let mut _vec_layout: Vec<Box<dyn Element>> = Vec::new();
+                                        let mut vec_layout = VecLayout{root:_vec_layout};
+                                        if let Some(elements) = item_obj.get("elements").and_then(|v| v.as_array()) {
+                                            if elements.len() == column_weights.len(){                                                
+                                                for element in elements {
+                                                    self.push_element(element, &mut vec_layout)?;
+                                                } 
+                                                let _= horizontal_layout.push_row(vec_layout.root);
+                                            }
+                                        } 
+                                        let nlayout = horizontal_layout.root.styled(mstyle);
+                                        let paddings = self.get_paddings(item_obj);                        
+                                        let nlayout = PaddedElement::new(
+                                            nlayout,
+                                            Margins::trbl(paddings[0], paddings[1], paddings[2], paddings[3]),
+                                        );
+                                        match root_layout.type_name(){
+                                            "NoneLayout" =>{    
+                                                self.doc.push(nlayout);
+                                            }
+                                            "StaticList" =>{
+                                                root_layout.push_static(nlayout);
+                                            }
+                                            "TableLayout" =>{
+                                                // not used
+                                            }   
+                                            "VecLayout" =>{
+                                                root_layout.push_cell(Box::new(nlayout));
+                                            }
+                                            _ => {                                                
+                                                root_layout.push(nlayout);
+                                            }
+                                        }                                                                                
+                                    }                                    
+                                }                                                                                                                                               
+                            }
+                        }
+                    }
+                    
+                    "table_layout" => {
+                        // inner: bool, outer: bool, cont: bool
+                        let mut list_decorador: Vec<bool> = vec!(true, true, true);
+                        if let Some(frame_decorator) = item_obj.get("frame_decorator").and_then(|v| v.as_array()) {
+                            if frame_decorator.len() == 3 {
+                                list_decorador.clear();
+                                for it in frame_decorator{
+                                    list_decorador.push(it.as_bool().expect("frame_decorator not bool"));
+                                }
+                            }
+                        }
+                        if let Some(column_weights) = item_obj.get("column_weights").and_then(|v| v.as_array()) {
+                            if column_weights.len() > 0 {                                        
+                                let usize_values: Vec<usize> = column_weights
+                                    .into_iter()
+                                    .filter_map(|val| {
+                                        if let serde_json::Value::Number(num) = val {
+                                            num.as_u64().and_then(|n| Some(n as usize))
+                                        } else {
+                                            None
+                                        }
+                                    })
+                                    .collect();
+                                let mut mstyle = style::Style::new();
+                                if let Some(style) = item_obj.get("style") {
+                                    mstyle = self.get_style(&style);                                       
+                                }    
+                                let mut _table_layout = TableLayout::new(usize_values);
+                                _table_layout.set_cell_decorator(FrameCellDecorator::new(list_decorador[0],list_decorador[1],list_decorador[2]));
+                                
+                                let mut frame_thickness = 0.1;
+                                let mut frame_color = style::Color::Rgb(0,0,0);
+                                if let Some(frame) = item_obj.get("frame").and_then(|v| v.as_object()) {
+                                    if let Some(thickness)= frame.get("thickness").and_then(|v| Some(v.as_f64().unwrap_or(0.0) as f32)){
+                                        frame_thickness = thickness;
+                                    }
+                                    if let Some(color) = frame.get("color"){
+                                        frame_color = get_color(color);
+                                    }
+                                    _table_layout.set_cell_decorator(FrameCellDecorator::with_line_style(list_decorador[0],list_decorador[1],list_decorador[2], 
+                                                                                                                style::LineStyle::new()
+                                                                                                                .with_thickness(frame_thickness)
+                                                                                                                .with_color(frame_color)));
+                                }  
+                                
+                                let mut table_layout = TLayout{root:_table_layout};
+                                if let Some(rows) = item_obj.get("rows").and_then(|v| v.as_array()) {
+                                    for row in rows{
+                                        let mut _vec_layout: Vec<Box<dyn Element>> = Vec::new();
+                                        let mut vec_layout = VecLayout{root:_vec_layout};
+                                        if let Some(row_elementos) = row.as_array() {
+                                            if row_elementos.len() == column_weights.len(){                                                
+                                                for element in row_elementos {
+                                                    self.push_element(element, &mut vec_layout)?;
+                                                } 
+                                                let _ = table_layout.push_row(vec_layout.root);
+                                            }
+                                        }        
+                                    }
+                                }
+                                let nlayout = table_layout.root.styled(mstyle);
+                                let paddings = self.get_paddings(item_obj);                        
+                                let nlayout = PaddedElement::new(
+                                    nlayout,
+                                    Margins::trbl(paddings[0], paddings[1], paddings[2], paddings[3]),
+                                );
+                                match root_layout.type_name(){
+                                    "NoneLayout" =>{    
+                                        self.doc.push(nlayout);
+                                    }
+                                    "StaticList" =>{
+                                        root_layout.push_static(nlayout);
+                                    }
+                                    "TableLayout" =>{
+                                        // not used
+                                    }   
+                                    "VecLayout" =>{
+                                        root_layout.push_cell(Box::new(nlayout));
+                                    }
+                                    _ => {                                                
+                                        root_layout.push(nlayout);
+                                    }
+                                } 
+                            }
+                        }                                            
+                    }
+                    
+                    "ordered_list" => {
+                        let mut _order_list = OrderedList::new();
+                        if let Some(start) = item_obj.get("start").and_then(|v| Some(v.as_f64().unwrap_or(0.0) as usize)){
+                            if start > 1 {
+                                _order_list = OrderedList::with_start(start);
+                            }
+                        }
+                        let mut order_list = OLayout{root: _order_list};
+                        if let Some(elements) = item_obj.get("elements").and_then(|v| v.as_array()) {
+                            for element in elements {
+                                self.push_element(element, &mut order_list)?;
+                            }                                    
+                        }    
+                        let mut has_frame = false;
+                        let mut frame_thickness = 0.1;
+                        let mut frame_color = style::Color::Rgb(0,0,0);
+                        if let Some(frame) = item_obj.get("frame").and_then(|v| v.as_object()) {
+                            if let Some(thickness)= frame.get("thickness").and_then(|v| Some(v.as_f64().unwrap_or(0.0) as f32)){
+                                frame_thickness = thickness;
+                            }
+                            if let Some(color) = frame.get("color"){
+                                frame_color = get_color(color);
+                            }
+                            has_frame = true
+                        }
+                        let mut mstyle = style::Style::new();
+                        if let Some(style) = item_obj.get("style") {
+                            mstyle = self.get_style(&style);                                       
+                        }
+                        let nlayout = order_list.root.styled(mstyle);
+                        let paddings = self.get_paddings(item_obj);                        
+                        let nlayout = PaddedElement::new(
+                            nlayout,
+                            Margins::trbl(paddings[0], paddings[1], paddings[2], paddings[3]),
+                        );
+                        match root_layout.type_name(){
+                            "NoneLayout" =>{         
+                                if has_frame{
+                                    let nlayout = elements::FramedElement::with_line_style(nlayout,
+                                                                                            style::LineStyle::new()
+                                                                                            .with_thickness(frame_thickness)
+                                                                                            .with_color(frame_color));
+                                    self.doc.push(nlayout);
+                                }else{
+                                    self.doc.push(nlayout);
+                                }                                 
+                            }
+                            "StaticList" =>{
+                                if has_frame{
+                                    let nlayout = elements::FramedElement::with_line_style(nlayout,
+                                                                                            style::LineStyle::new()
+                                                                                            .with_thickness(frame_thickness)
+                                                                                            .with_color(frame_color));
+                                    root_layout.push_static(nlayout);
+                                }else{
+                                    root_layout.push_static(nlayout);
+                                }                                 
+                            }
+                            "TableLayout" =>{
+                                //
+                            }  
+                            "VecLayout" =>{
+                                if has_frame{
+                                    let nlayout = elements::FramedElement::with_line_style(nlayout,
+                                                                                            style::LineStyle::new()
+                                                                                            .with_thickness(frame_thickness)
+                                                                                            .with_color(frame_color));
+                                    root_layout.push_cell(Box::new(nlayout));
+                                }else{
+                                    root_layout.push_cell(Box::new(nlayout));
+                                }                                 
+                            }
+                            _ => {
+                                if has_frame{
+                                    let nlayout = elements::FramedElement::with_line_style(nlayout,
+                                                                                            style::LineStyle::new()
+                                                                                            .with_thickness(frame_thickness)
+                                                                                            .with_color(frame_color));
+                                    root_layout.push(nlayout);
+                                }else{
+                                    root_layout.push(nlayout);
+                                }                                
+                            }
+                        }
+                    }
+                    
+                    "unordered_list" => {
+                        let mut _unorder_list = UnorderedList::new();
+                        if let Some(bullet) = item_obj.get("bullet").and_then(|v| v.as_str()) {
+                            if bullet != ""{
+                                _unorder_list = UnorderedList::with_bullet(bullet);
+                            }
+                        }
+                        let mut unorder_list = ULayout{root: _unorder_list};
+                        if let Some(elements) = item_obj.get("elements").and_then(|v| v.as_array()) {
+                            for element in elements {
+                                self.push_element(element, &mut unorder_list)?;
+                            }                                    
+                        } 
+                        let mut has_frame = false;
+                        let mut frame_thickness = 0.1;
+                        let mut frame_color = style::Color::Rgb(0,0,0);
+                        if let Some(frame) = item_obj.get("frame").and_then(|v| v.as_object()) {
+                            if let Some(thickness)= frame.get("thickness").and_then(|v| Some(v.as_f64().unwrap_or(0.0) as f32)){
+                                frame_thickness = thickness;
+                            }
+                            if let Some(color) = frame.get("color"){
+                                frame_color = get_color(color);
+                            }
+                            has_frame = true
+                        }                        
+                        
+                        let mut mstyle = style::Style::new();
+                        if let Some(style) = item_obj.get("style") {
+                            mstyle = self.get_style(&style);                                       
+                        }
+                        let nlayout = unorder_list.root.styled(mstyle);
+                        let paddings = self.get_paddings(item_obj);                        
+                        let nlayout = PaddedElement::new(
+                            nlayout,
+                            Margins::trbl(paddings[0], paddings[1], paddings[2], paddings[3]),
+                        );
+                        match root_layout.type_name(){
+                            "NoneLayout" =>{
+                                if has_frame{
+                                    let nlayout = elements::FramedElement::with_line_style(nlayout,
+                                                                                            style::LineStyle::new()
+                                                                                            .with_thickness(frame_thickness)
+                                                                                            .with_color(frame_color));
+                                    self.doc.push(nlayout);
+                                }else{
+                                    self.doc.push(nlayout);
+                                }
+                            }
+                            "StaticList" =>{
+                                if has_frame{
+                                    let nlayout = elements::FramedElement::with_line_style(nlayout,
+                                                                                            style::LineStyle::new()
+                                                                                            .with_thickness(frame_thickness)
+                                                                                            .with_color(frame_color));
+                                    root_layout.push_static(nlayout);
+                                }else{
+                                    root_layout.push_static(nlayout);
+                                }
+                            }
+                            "TableLayout" =>{
+                                //
+                            }  
+                            "VecLayout" =>{
+                                if has_frame{
+                                    let nlayout = elements::FramedElement::with_line_style(nlayout,
+                                                                                            style::LineStyle::new()
+                                                                                            .with_thickness(frame_thickness)
+                                                                                            .with_color(frame_color));
+                                    root_layout.push_cell(Box::new(nlayout));
+                                }else{
+                                    root_layout.push_cell(Box::new(nlayout));
+                                }
+                            }
+                            _ => {
+                                if has_frame{
+                                    let nlayout = elements::FramedElement::with_line_style(nlayout,
+                                                                                            style::LineStyle::new()
+                                                                                            .with_thickness(frame_thickness)
+                                                                                            .with_color(frame_color));
+                                    root_layout.push(nlayout);
+                                }else{
+                                    root_layout.push(nlayout);
+                                }
+                            }
+                        }
+                    }
+                    
+                    "break" => {
+                        if let Some(value) = item_obj.get("value").and_then(|v| Some(v.as_f64().unwrap_or(0.0) as f32)) {
+                            let element = Break::new(value);
+                            if value > 0.0 {
+                                match root_layout.type_name(){
+                                    "NoneLayout" =>{                                                
+                                        self.doc.push(element);
+                                    }
+                                    "StaticList" =>{
+                                        root_layout.push_static(element);
+                                    }
+                                    "TableLayout" =>{
+                                        //
+                                    }  
+                                    "VecLayout" =>{
+                                        root_layout.push_cell(Box::new(element));
+                                    }
+                                    _ => {
+                                        root_layout.push(element);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    "page_break" => {                       
+                        let element = PageBreak::new();
+                        self.doc.push(element);                                                  
+                    }
+                    
+                    "image" => {   
+                        let mut path =  "".to_string();
+                        let mut base64 = "".to_string();
+                        if let Some(_path) = item_obj.get("path").and_then(|v| v.as_str()) {
+                            path = _path.to_string();
+                        }   
+                        if let Some(_base64) = item_obj.get("base64").and_then(|v| v.as_str()) {
+                            base64 = _base64.to_string();
+                        }
+                        if path != "".to_string() || base64 != "".to_string() {
+                            let mut image = if path != "".to_string() {
+                                rckive_genpdf::elements::Image::from_path(path).expect("Unable to load image")
+                            }else{
+                                rckive_genpdf::elements::Image::from_base64(&base64).expect("Unable to load image")
+                            };
+                            
+                            if let Some(str_alignment) = item_obj.get("alignment").and_then(|v| v.as_str()) {
+                                if let Some(alignment) = self.alignment_map.get(str_alignment) { 
+                                    image.set_alignment(*alignment);
+                                }
+                            }
+                            if let Some(position) = item_obj.get("position").and_then(|v| v.as_array()) {
+                                    if position.len() >= 2 {
+                                        let posx = position[0].as_f64().unwrap_or(0.0) as f32;
+                                        let posy = position[1].as_f64().unwrap_or(0.0) as f32;
+                                        image.set_position(rckive_genpdf::Position::new(posx, posy));
+                                    }
+                            }
+                            if let Some(rotation) = item_obj.get("rotation").and_then(|v| Some(v.as_f64().unwrap_or(0.0) as f32)) {
+                                image.set_clockwise_rotation(rotation);
+                            }
+                            if let Some(dpi) = item_obj.get("dpi").and_then(|v| Some(v.as_f64().unwrap_or(0.0) as f32)) {
+                                image.set_dpi(dpi);
+                            }
+                            if let Some(scale) = item_obj.get("scale").and_then(|v| v.as_array()) {
+                                if scale.len()>=2{
+                                    let s1 = scale[0].as_f64().unwrap_or(0.0) as f32;
+                                    let s2 = scale[1].as_f64().unwrap_or(0.0) as f32;
+                                    image.set_scale(rckive_genpdf::Scale::new(s1,s2));
+                                }
+                            }else{
+                                if let Some(scale) = item_obj.get("scale").and_then(|v| Some(v.as_f64().unwrap_or(0.0) as f32)) {                            
+                                    image.set_scale(rckive_genpdf::Scale::new(scale,scale));
+                                }
+                            }
+                            let mut has_frame = false;
+                            let mut frame_thickness = 0.1;
+                            let mut frame_color = style::Color::Rgb(0,0,0);
+                            if let Some(frame) = item_obj.get("frame").and_then(|v| v.as_object()) {
+                                if let Some(thickness)= frame.get("thickness").and_then(|v| Some(v.as_f64().unwrap_or(0.0) as f32)){
+                                    frame_thickness = thickness;
+                                }
+                                if let Some(color) = frame.get("color"){
+                                    frame_color = get_color(color);
+                                }
+                                has_frame = true
+                            }
+                            let paddings = self.get_paddings(item_obj);                        
+                            let image = PaddedElement::new(
+                                image,
+                                Margins::trbl(paddings[0], paddings[1], paddings[2], paddings[3]),
+                            );
+                            match root_layout.type_name(){
+                                    "NoneLayout" =>{       
+                                        if has_frame{
+                                            let nlayout = elements::FramedElement::with_line_style(image,
+                                                                                            style::LineStyle::new()
+                                                                                            .with_thickness(frame_thickness)
+                                                                                            .with_color(frame_color));
+                                            self.doc.push(nlayout);
+                                        }else{
+                                            self.doc.push(image);
+                                        }                                        
+                                    }
+                                    "StaticList" =>{
+                                        if has_frame{
+                                            let nlayout = elements::FramedElement::with_line_style(image,
+                                                                                            style::LineStyle::new()
+                                                                                            .with_thickness(frame_thickness)
+                                                                                            .with_color(frame_color));
+                                            root_layout.push_static(nlayout);
+                                        }else{
+                                            root_layout.push_static(image);
+                                        }                                         
+                                    }
+                                    "TableLayout" =>{
+                                        //
+                                    }  
+                                    "VecLayout" =>{
+                                        if has_frame{
+                                            let nlayout = elements::FramedElement::with_line_style(image,
+                                                                                            style::LineStyle::new()
+                                                                                            .with_thickness(frame_thickness)
+                                                                                            .with_color(frame_color));
+                                            root_layout.push_cell(Box::new(nlayout));
+                                        }else{
+                                            root_layout.push_cell(Box::new(image));
+                                        }                                        
+                                    }
+                                    _ => {
+                                        if has_frame{
+                                            let nlayout = elements::FramedElement::with_line_style(image,
+                                                                                            style::LineStyle::new()
+                                                                                            .with_thickness(frame_thickness)
+                                                                                            .with_color(frame_color));
+                                            root_layout.push(nlayout);
+                                        }else{
+                                            root_layout.push(image);
+                                        }                                        
+                                    }
+                            }                                                        
+                        }
+                    }
+                    "paragraph" => {                                          
+                        // only Paragraph implemented
+                        let mut element = Paragraph::default();
+                                             
+                        //alignment
+                        if let Some(str_alignment) = item_obj.get("alignment").and_then(|v| v.as_str()) {
+                            if let Some(alignment) = self.alignment_map.get(str_alignment) { 
+                                element.set_alignment(*alignment);
+                            }
+                        }
+                        
+                        let mstyle = style::Style::new();
+                        if let Some(value) = item_obj.get("value").and_then(|v| v.as_array()) {
+                            for val_style in value {      
+                                let mstyle = self.get_style(&val_style);                                
+                                if let Some(text) = val_style.get("text").and_then(|v| v.as_str()) {
+                                    element.push_styled(text, mstyle);         
+                                }                                
+                            }
+                        }else{
+                            if let Some(value) = item_obj.get("value").and_then(|v| v.as_str()) {
+                                element.push_styled(value, mstyle);  
+                            }
+                        }                               
+                        // top, right, bottom, left
+                        let paddings = self.get_paddings(item_obj);                        
+                        let element = PaddedElement::new(
+                                    element,
+                                    Margins::trbl(paddings[0], paddings[1], paddings[2], paddings[3]),
+                                );  
+                        let mut has_frame = false;
+                        let mut frame_thickness = 0.1;
+                        let mut frame_color = style::Color::Rgb(0,0,0);
+                        if let Some(frame) = item_obj.get("frame").and_then(|v| v.as_object()) {
+                            if let Some(thickness)= frame.get("thickness").and_then(|v| Some(v.as_f64().unwrap_or(0.0) as f32)){
+                                frame_thickness = thickness;
+                            }
+                            if let Some(color) = frame.get("color"){
+                                frame_color = get_color(color);
+                            }
+                            has_frame = true
+                        }                        
+                        let mut bullet = "";
+                        if let Some(bullet_point) = item_obj.get("bullet").and_then(|v| v.as_str()) {
+                            bullet = bullet_point
+                        }
+                        self.match_text_paragraph(element, root_layout, has_frame, frame_thickness, frame_color, bullet)?;
+                    }
+                        
+                    "text" => {
+                        let mut element = Text::default();
+                        if let Some(value) = item_obj.get("value").and_then(|v| v.as_str()) {
+                            if let Some(style) = item_obj.get("style") {
+                                let mstyle = self.get_style(&style);   
+                                element = Text::new(style::StyledString::new(value, mstyle));
+                            }else{                                
+                                element = Text::new(value);
+                            }
+                        }                                                                                                   
+                        // // top, right, bottom, left
+                        let paddings = self.get_paddings(item_obj);                        
+                        let element = PaddedElement::new(
+                                    element,
+                                    Margins::trbl(paddings[0], paddings[1], paddings[2], paddings[3]),
+                                );  
+                        let mut has_frame = false;
+                        let mut has_frame = false;
+                        let mut frame_thickness = 0.1;
+                        let mut frame_color = style::Color::Rgb(0,0,0);
+                        if let Some(frame) = item_obj.get("frame").and_then(|v| v.as_object()) {
+                            if let Some(thickness)= frame.get("thickness").and_then(|v| Some(v.as_f64().unwrap_or(0.0) as f32)){
+                                frame_thickness = thickness;
+                            }
+                            if let Some(color) = frame.get("color"){
+                                frame_color = get_color(color);
+                            }
+                            has_frame = true
+                        }                      
+                        let mut bullet = "";
+                        if let Some(bullet_point) = item_obj.get("bullet").and_then(|v| v.as_str()) {
+                            bullet = bullet_point
+                        }
+                        self.match_text_paragraph(element, root_layout, has_frame, frame_thickness, frame_color, bullet)?;
+                                              
+                    },
+                    _ => println!("The JSON does not have the expected type."),                
+                }
+            }                
+         Ok(())
+    }    
+}
+
+pub fn render_json_file(json_path: impl AsRef<path::Path>, path: impl AsRef<path::Path>) -> Result<(), Box<dyn std::error::Error>> {
+        let mut config_default = json!({        
+                "fonts":[
+                    // {"font_family_name":"LiberationSans",  "dir":"/usr/share/fonts/truetype/liberation"}
+                ],
+                "title": "Report GenPdfJson",
+                "default_font":{"font_family_name":"LiberationSans",  "dir":"/usr/share/fonts/truetype/liberation"},
+                "margins":10                
+        });
+        let json_string = fs::read_to_string(json_path)?;
+        let json_value: Value = serde_json::from_str(&json_string)?;
+        if let Some(config) = json_value.get("config") {
+            config_default = config.clone();        
+        }
+        
+        println!("init ...");
+        let genpdf = GenpdfJson::new(&config_default);    
+        genpdf.render_json_file(&json_value, path)?;
+        println!("generated successfully");
+        Ok(())
+    }
+    
+pub fn render_json_base64(json_string: &String, _path: impl AsRef<path::Path>) -> Result<String, Box<dyn std::error::Error>> {
+        let mut config_default = json!({        
+                "fonts":[
+                    // {"font_family_name":"LiberationSans",  "dir":"/usr/share/fonts/truetype/liberation"}
+                ],
+                "title": "Report GenPdfJson",
+                "default_font":{"font_family_name":"LiberationSans",  "dir":"/usr/share/fonts/truetype/liberation"},
+                "margins":10
+        });      
+        let json_value: Value = serde_json::from_str(&json_string)?;
+        if let Some(config) = json_value.get("config") {
+            config_default = config.clone();        
+        }        
+        let genpdf = GenpdfJson::new(&config_default);    
+        let result = genpdf.render_json_base64(&json_value)?;        
+        Ok(result)
+    }    
+ 
