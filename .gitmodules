@@ -1,3 +1,6 @@
 [submodule "rckive-genpdf-rs"]
 	path = rckive-genpdf-rs
 	url = https://github.com/numaelis/rckive-genpdf-rs.git
+[submodule "genpdf-json-bin"]
+	path = genpdf-json-bin
+	url = https://github.com/numaelis/genpdf-json-bin.git
