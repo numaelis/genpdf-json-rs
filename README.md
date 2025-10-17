@@ -97,7 +97,153 @@ fn main() {
 ```
 
 
+type support
 
+config:
+```
+"config":{
+    "title":"", 
+    "style": style, 
+    "page_size": string or [float, float]  -> "A4", "Legal", "Letter", or [200,200]
+    "fonts" : [{"font_family_name":"", dir:""}],
+    "default_font": {"font_family_name":"", dir:""}
+    "line_spacing": float,
+    "margins": [float, float, float, float],
+    "head_page": paragraph,
+    "head_page_count", paragraph,
+    "deafault_font_size" int
+}
+```
 
+line_style:
+```
+ {
+    "thickness":float
+    "color":color
+ }
+```
 
+margins:
+```
+    [top, right, bottom, left]
+```
+
+style:
+```
+ {
+    "bold":bool,
+    "italic":bool,
+    "font_family": string,
+    "color": color,
+    "line_spacing": float
+ }
+```
+
+alignment:
+```
+    "left"
+    "center"
+    "right"
+```
+
+string_style:
+```
+ {
+    "text": string
+    "bold":bool,
+    "italic":bool,
+    "font_family": string,
+    "color": color,
+    "line_spacing": float
+ }
+```
+
+color:
+```
+    {"type":"rgb", "value":[int, int, int]}
+    {"type":"cmyk", "value":[int, int, int, int]}
+    {"type":"greyscale", "value":int}
+```
+elements
+```
+ {
+    "type": layout,
+    "orientation":"vertical"
+    "frame": line_style,
+    "style": style,
+    "padding": margins,
+    "elements": [...elements...]
+ }
+ 
+ {
+    "type": layout,
+    "orientation":"horizontal"
+    "column_weights": [],
+    "frame": line_style,
+    "style": style,
+    "padding": margins,
+    "elements": [...elements column_weights...] -> 
+ }
+ 
+ {
+    "type": table_layout,
+    "frame_decorator":[[inner(bool), outer(bool), cont(bool)], line_style]
+    "column_weights": [],
+    "frame": line_style,
+    "style": style,
+    "padding": margins,
+    "rows": [...row column_weights...] -> 
+ }
+ 
+ {
+    "type": unordered_list,
+    "frame": line_style,
+    "style": style,
+    "padding": margins,
+    "elements": [...elements...]
+    "bullet": string
+ }
+ 
+ {
+    "type": ordered_list,
+    "frame": line_style,
+    "style": style,
+    "padding": margins,
+    "elements": [...elements...]
+    "start": int
+ }
+ 
+ {
+    "type": paragraph,
+    "frame": line_style,
+    "style": style,
+    "padding": margins,
+    "value": [...string_style...]
+    "alignment" alignment
+    "bullet": string
+ }
+ 
+ {
+    "type": image,
+    "path": string,
+    "base64": string,
+    "frame": line_style,    
+    "padding": margins,    
+    "alignment" alignment
+    "position": [float, float],
+    "scale": float,
+    "rotation", float  +-
+    "dpi": float    
+ }
+ 
+ {
+    "type" : "break", 
+    "value": float
+ }
+ 
+ {  
+    "type" : "page_break"
+ }
+ 
+```
 
