@@ -13,7 +13,7 @@ license = "GPL3"
 
 [dependencies]
 #support json rckive-genpdf-rs -> https://github.com/numaelis/rckive-genpdf-rs.git
-rckive-genpdf = { git = "https://github.com/numaelis/rckive-genpdf-rs.git", features = ["images", "hyphenation"]}
+rckive-genpdf = {version = "0.4.0", git = "https://github.com/numaelis/rckive-genpdf-rs.git", features = ["images", "hyphenation"]}
 image = "0.25"
 
 serde = { version = "1.0", features = ["derive"] }
