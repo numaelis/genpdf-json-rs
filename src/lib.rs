@@ -1242,7 +1242,7 @@ pub fn render_json_file(json_path: impl AsRef<path::Path>, path: impl AsRef<path
         Ok(())
     }
     
-pub fn render_json_base64(json_string: &String, _path: impl AsRef<path::Path>) -> Result<String, Box<dyn std::error::Error>> {
+pub fn render_json_base64(json_string: &String) -> Result<String, Box<dyn std::error::Error>> {
         let mut config_default = json!({        
                 "fonts":[
                     // {"font_family_name":"LiberationSans",  "dir":"/usr/share/fonts/truetype/liberation"}
