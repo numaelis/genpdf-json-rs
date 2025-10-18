@@ -2,7 +2,7 @@
 
 rckive-genpdf is a user-friendly PDF generator written in pure Rust.
 
-genpdf-json uses rckive-genpdf and generates a PDF from JSON data.
+genpdf-json uses rckive-genpdf (https://github.com/RCKIVE/rckive-genpdf-rs) and generates a PDF from JSON data.
 
 The library can be used in two ways:
 

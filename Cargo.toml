@@ -7,8 +7,8 @@ authors = [
 ]
 exclude = [".builds/*"]
 keywords = ["json", "pdf", "text", "layout"]
-homepage = ""
-repository = ""
+homepage = "https://github.com/numaelis/genpdf-json-rs"
+repository = "https://github.com/numaelis/genpdf-json-rs"
 license = "GPL3"
 
 [dependencies]
