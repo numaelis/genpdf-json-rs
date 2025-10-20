@@ -52,6 +52,8 @@ The json file must have config and elements:
 }
 ```
 
+
+Using base64 string:
 ```rust
 use serde_json::json;
 use genpdf_json;
@@ -97,7 +99,8 @@ fn main() {
 ```
 
 
-type support
+Type support
+___________
 
 config:
 ```
