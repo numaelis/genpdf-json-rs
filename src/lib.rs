@@ -11,6 +11,8 @@ use std::fs;
 use serde_json::{json, Value};
 use std::{collections::HashMap};
 
+use rusqlite::{params, Connection, Result};
+
 type PdfDocument = rckive_genpdf::Document;
 
 struct GenpdfJson {
@@ -389,6 +391,31 @@ impl GenpdfJson {
         let bytes = self.doc.render_to_base64()?;
         Ok(bytes)
         
+    }
+    
+    fn push_elements_from_sqlite(&mut self, db_path: impl AsRef<path::Path>) -> Result<(), Box<dyn std::error::Error>> {
+        let conn = Connection::open(db_path)?;
+        let mut stmt = conn.prepare("SELECT element FROM elements ORDER BY id ASC")?;
+        let mut rows = stmt.query(params![])?;
+        while let Some(row) = rows.next()? {            
+            let data_string: String = row.get("element")?;
+            let json_value: Value = serde_json::from_str(&data_string)?;
+            let mut none_ = NoneLayout{root:0};
+            self.push_element(&json_value, &mut none_)?;
+        }
+        Ok(())
+    }
+    
+    fn render_file_from_sqlite(mut self, db_path: impl AsRef<path::Path>, path: impl AsRef<path::Path>) -> Result<(), Box<dyn std::error::Error>> {        
+        self.push_elements_from_sqlite(db_path)?;               
+        self.doc.render_to_file(path)?;
+        Ok(())
+    }
+    
+    fn render_base64_from_sqlite(mut self, db_path: impl AsRef<path::Path>) -> Result<String, Box<dyn std::error::Error>> {
+        self.push_elements_from_sqlite(db_path)?;
+        let bytes = self.doc.render_to_base64()?;
+        Ok(bytes)        
     }
     
     fn push_elements(&mut self, json_obj: &serde_json::Value) -> Result<(), Box<dyn std::error::Error>> {
@@ -1258,5 +1285,52 @@ pub fn render_json_base64(json_string: &String) -> Result<String, Box<dyn std::e
         let genpdf = GenpdfJson::new(&config_default);    
         let result = genpdf.render_json_base64(&json_value)?;        
         Ok(result)
-    }    
- 
+    }
+
+pub fn render_file_from_sqlite(db_path: impl AsRef<path::Path>, path: impl AsRef<path::Path>) -> Result<(), Box<dyn std::error::Error>> {
+        let mut config_default = json!({        
+                "fonts":[
+                    // {"font_family_name":"LiberationSans",  "dir":"/usr/share/fonts/truetype/liberation"}
+                ],
+                "title": "Report GenPdfJson",
+                "default_font":{"font_family_name":"LiberationSans",  "dir":"/usr/share/fonts/truetype/liberation"},
+                "margins":10                
+        });
+        
+        let mut conn = Connection::open(&db_path)?;
+        let mut stmt = conn.prepare("SELECT data FROM config LIMIT 1")?;
+        
+        let mut rows = stmt.query([])?;
+        if let Some(row) = rows.next()? {
+            let data_string: String = row.get("data")?;
+            config_default = serde_json::from_str(&data_string)?;
+        }    
+                
+        println!("init ...");
+        let genpdf = GenpdfJson::new(&config_default);    
+        genpdf.render_file_from_sqlite(db_path, path)?;
+        println!("generated successfully");
+        Ok(())
+}
+
+pub fn render_base64_from_sqlite(db_path: impl AsRef<path::Path>) -> Result<String, Box<dyn std::error::Error>> {
+    let mut config_default = json!({        
+            "fonts":[
+                // {"font_family_name":"LiberationSans",  "dir":"/usr/share/fonts/truetype/liberation"}
+            ],
+            "title": "Report GenPdfJson",
+            "default_font":{"font_family_name":"LiberationSans",  "dir":"/usr/share/fonts/truetype/liberation"},
+            "margins":10
+    });      
+    let mut conn = Connection::open(&db_path)?;
+        let mut stmt = conn.prepare("SELECT data FROM config LIMIT 1")?;
+        
+        let mut rows = stmt.query([])?;
+        if let Some(row) = rows.next()? {
+            let data_string: String = row.get("data")?;
+            config_default = serde_json::from_str(&data_string)?;
+        }          
+    let genpdf = GenpdfJson::new(&config_default);    
+    let result = genpdf.render_base64_from_sqlite(&db_path)?;        
+    Ok(result)
+}    
