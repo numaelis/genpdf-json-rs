@@ -17,4 +17,4 @@ rckive-genpdf = {version = "0.4.0", git = "https://github.com/numaelis/rckive-ge
 image = "0.25"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-
+rusqlite = "0.29.0"
