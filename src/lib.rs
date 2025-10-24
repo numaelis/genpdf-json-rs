@@ -19,6 +19,7 @@ struct GenpdfJson {
     doc: rckive_genpdf::Document,
     alignment_map: HashMap<String, Alignment>,    
     font_cache: HashMap<String, FontFamily<Font>>,
+    db_path: String,
 }
 
 pub trait RootLayout {
@@ -224,7 +225,7 @@ fn get_head_style(val_style: &serde_json::Value, font_cache: &HashMap<String, Fo
 }
     
 impl GenpdfJson {
-    fn new(json_config: &serde_json::Value) -> Self {        
+    fn new(json_config: &serde_json::Value, db_path: impl AsRef<path::Path>) -> Self {        
         let mut alignment_map = HashMap::new();
         alignment_map.insert("center".to_string(), Alignment::Center);
         alignment_map.insert("left".to_string(), Alignment::Left);
@@ -371,11 +372,12 @@ impl GenpdfJson {
 //                     .expect("Failed to load hyphenation data"),
 //             );
 //         }            
-        
+        let db_path = db_path.as_ref().display().to_string();
         GenpdfJson {
             doc,
             alignment_map,            
             font_cache: fcache,
+            db_path,
         }
     }    
     
@@ -810,6 +812,28 @@ impl GenpdfJson {
                                                 let _ = table_layout.push_row(vec_layout.root);
                                             }
                                         }        
+                                    }
+                                }else{
+                                    // use sqlite in rows
+                                    if let Some(tablename) = item_obj.get("rows").and_then(|v| v.as_str()) {                                     
+                                        let conn = Connection::open(&self.db_path)?;
+                                        let mut stmt = conn.prepare(format!("SELECT row FROM {} ORDER BY id ASC", tablename).as_str())?;
+                                        let mut rows = stmt.query(params![])?;
+                                        while let Some(row) = rows.next()? {            
+                                            let data_string: String = row.get("row")?;
+                                            let json_value: Value = serde_json::from_str(&data_string)?;
+                                            
+                                            let mut _vec_layout: Vec<Box<dyn Element>> = Vec::new();
+                                            let mut vec_layout = VecLayout{root:_vec_layout};
+                                            if let Some(row_elementos) = json_value.as_array() {
+                                                if row_elementos.len() == column_weights.len(){                                                
+                                                    for element in row_elementos {
+                                                        self.push_element(element, &mut vec_layout)?;
+                                                    } 
+                                                    let _ = table_layout.push_row(vec_layout.root);
+                                                }
+                                            }                                                                                                                                       
+                                        }                                        
                                     }
                                 }
                                 let nlayout = table_layout.root.styled(mstyle);
@@ -1263,7 +1287,7 @@ pub fn render_json_file(json_path: impl AsRef<path::Path>, path: impl AsRef<path
         }
         
         println!("init ...");
-        let genpdf = GenpdfJson::new(&config_default);    
+        let genpdf = GenpdfJson::new(&config_default, "");    
         genpdf.render_json_file(&json_value, path)?;
         println!("generated successfully");
         Ok(())
@@ -1282,7 +1306,7 @@ pub fn render_json_base64(json_string: &String) -> Result<String, Box<dyn std::e
         if let Some(config) = json_value.get("config") {
             config_default = config.clone();        
         }        
-        let genpdf = GenpdfJson::new(&config_default);    
+        let genpdf = GenpdfJson::new(&config_default, "");    
         let result = genpdf.render_json_base64(&json_value)?;        
         Ok(result)
     }
@@ -1307,8 +1331,8 @@ pub fn render_file_from_sqlite(db_path: impl AsRef<path::Path>, path: impl AsRef
         }    
                 
         println!("init ...");
-        let genpdf = GenpdfJson::new(&config_default);    
-        genpdf.render_file_from_sqlite(db_path, path)?;
+        let genpdf = GenpdfJson::new(&config_default, &db_path);    
+        genpdf.render_file_from_sqlite(&db_path, path)?;
         println!("generated successfully");
         Ok(())
 }
@@ -1330,7 +1354,7 @@ pub fn render_base64_from_sqlite(db_path: impl AsRef<path::Path>) -> Result<Stri
             let data_string: String = row.get("data")?;
             config_default = serde_json::from_str(&data_string)?;
         }          
-    let genpdf = GenpdfJson::new(&config_default);    
+    let genpdf = GenpdfJson::new(&config_default, &db_path);    
     let result = genpdf.render_base64_from_sqlite(&db_path)?;        
     Ok(result)
 }    
