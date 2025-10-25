@@ -283,7 +283,10 @@ Other important information:
 If you need a small PDF file size on disk, use light fonts, as they are embedded within the PDF.
 
 Links:
+
 https://github.com/numaelis/genpdf-json-bin
+
 https://gitlab.com/numaelis/pygenpdf_json
+
 https://gitlab.com/numaelis/pygenpdf
 
