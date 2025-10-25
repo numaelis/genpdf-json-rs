@@ -9,13 +9,36 @@ The library can be used in two ways:
 1. Search for a JSON file and create a new PDF file in the specified path.
 2. Pass a JSON string and receive a PDF file in Base64 text.
 
+El JSON puede ser pasado directamente o usando un archivo sqlite.db
+
+Options:
+```rust
+let _ = genpdf_json::render_json_file("file.json", "report.pdf");
+
+let file_pdf_base64 = genpdf_json::render_json_base64(&json_string);
+
+let _ = genpdf_json::render_file_from_sqlite("file.db", "report.pdf");
+
+let file_pdf_base64 = genpdf_json::render_base64_from_sqlite("file.db");
+
+```
+
+The structure of the document is:
+```
+    {
+        "config": {...},
+        "elements": [...elements...]
+    }
+```
+
+examples:
 
 ```rust
 use genpdf_json;
 let _ = genpdf_json::render_json_file("file.json", "report.pdf");
 ```
 
-The json file must have config and elements:
+file.json:
 
 ```
 {
@@ -97,6 +120,13 @@ fn main() {
     println!("{:?}",file_pdf_base64);
 }
 ```
+
+SQLite:
+To save the config:
+In a table called config, use a column named data (Text), and in this column, save a record with the config's JSON.
+For the elements:
+In a table called elements, use the id (autoincrement) column and the element (Text) column, and save the elements in each record in the JSON order.
+Optionally, for table layouts, save the rows in a new table separate from config and elements, with the structure id (autoincrement) and row (Text). Then, reassign the value to the JSON "rows" with the name of the table created.
 
 
 Type support
@@ -246,7 +276,14 @@ elements
  
  {  
     "type" : "page_break"
- }
- 
+ } 
 ```
+
+Other important information:
+If you need a small PDF file size on disk, use light fonts, as they are embedded within the PDF.
+
+Links:
+https://github.com/numaelis/genpdf-json-bin
+https://gitlab.com/numaelis/pygenpdf_json
+https://gitlab.com/numaelis/pygenpdf
 
