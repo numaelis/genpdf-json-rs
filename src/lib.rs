@@ -362,16 +362,14 @@ impl GenpdfJson {
             }
         }
                    
-//         #[cfg(feature = "hyphenation")]
-//         {
-//             
-//             use hyphenation::Load;
-// 
-//             doc.set_hyphenator(
-//                 hyphenation::Standard::from_embedded(hyphenation::Language::EnglishUS)
-//                     .expect("Failed to load hyphenation data"),
-//             );
-//         }            
+       //Enabling hyphenation helps with word wrapping, but not all words. This needs to be improved.
+        use hyphenation::Load;
+
+        doc.set_hyphenator(
+            hyphenation::Standard::from_embedded(hyphenation::Language::EnglishUS)
+                .expect("Failed to load hyphenation data"),
+        );             
+        
         let db_path = db_path.as_ref().display().to_string();
         GenpdfJson {
             doc,
