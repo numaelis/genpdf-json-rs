@@ -1,6 +1,6 @@
 [package]
 name = "genpdf-json"
-version = "0.1.3"
+version = "0.1.4"
 edition = "2024"
 authors = [
     "Numael Garay <mantrixsoft@gmail.com>"
@@ -13,8 +13,8 @@ license = "GPL3"
 
 [dependencies]
 #support json rckive-genpdf-rs -> https://github.com/numaelis/rckive-genpdf-rs.git
-rckive-genpdf = {version = "0.4.0", git = "https://github.com/numaelis/rckive-genpdf-rs.git", features = ["images", "hyphenation"]}
-# rckive-genpdf = {version = "0.4.0", path = "rckive-genpdf/", features = ["images", "hyphenation"]}
+#rckive-genpdf = {version = "0.4.0", git = "https://github.com/numaelis/rckive-genpdf-rs.git", features = ["images", "hyphenation"]}
+rckive-genpdf = {version = "0.4.0", path = "rckive-genpdf/", features = ["images", "hyphenation"]}
 image = "0.25"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
