@@ -234,6 +234,11 @@ impl GenpdfJson {
         let default_font = get_font_default(&json_config).unwrap();
         let mut doc = PdfDocument::new(default_font);
         
+        // Skip the page size exceeded warning
+        if let Some(skip_warning_overflowed) = json_config.get("skip_warning_overflowed").and_then(|v| v.as_bool()) { 
+            doc.set_skip_warning_overflowed(skip_warning_overflowed);
+        }
+                
         let mut fcache = HashMap::new();
         if let Some(fonts) = json_config.get("fonts").and_then(|v| v.as_array()) {
             for font in fonts {
@@ -475,10 +480,12 @@ impl GenpdfJson {
         if let Some(size) = val_style.get("size").and_then(|v| Some(v.as_f64().unwrap_or(0.0) as u8)) {
             mstyle.set_font_size(size);
         }
+        if let Some(fit_font_size_to) = val_style.get("fit_size_to").and_then(|v| Some(v.as_f64().unwrap_or(0.0) as u8)) {
+            mstyle.set_fit_font_size_to(fit_font_size_to);
+        }
         if let Some(line_spacing) = val_style.get("line_spacing").and_then(|v| Some(v.as_f64().unwrap_or(0.0) as f32)) {
             mstyle.set_line_spacing(line_spacing);
-        }
-        
+        }        
         if let Some(val_color) = val_style.get("color") {       //.and_then(|v| v.as_object())
                 let color = get_color(val_color);
                 mstyle.set_color(color);            
@@ -1316,7 +1323,8 @@ pub fn render_file_from_sqlite(db_path: impl AsRef<path::Path>, path: impl AsRef
                 ],
                 "title": "Report GenPdfJson",
                 "default_font":{"font_family_name":"LiberationSans",  "dir":"/usr/share/fonts/truetype/liberation"},
-                "margins":10                
+                "margins":10,
+                "skip_warning_overflowed": true
         });
         
         let mut conn = Connection::open(&db_path)?;
@@ -1342,7 +1350,8 @@ pub fn render_base64_from_sqlite(db_path: impl AsRef<path::Path>) -> Result<Stri
             ],
             "title": "Report GenPdfJson",
             "default_font":{"font_family_name":"LiberationSans",  "dir":"/usr/share/fonts/truetype/liberation"},
-            "margins":10
+            "margins":10,
+            "skip_warning_overflowed": true
     });      
     let mut conn = Connection::open(&db_path)?;
         let mut stmt = conn.prepare("SELECT data FROM config LIMIT 1")?;
