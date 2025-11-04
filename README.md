@@ -53,7 +53,8 @@ file.json:
         "fonts": [], 
         "default_font": {"font_family_name": "LiberationSans", "dir": "/usr/share/fonts/truetype/liberation"}, 
         "head_page": {"type": "paragraph", "value": [{"text": "report genpdf-rs", "bold": true, "size": 8, "italic": true}], "alignment": "right"}, 
-        "margins": [7, 10, 10, 10], "line_spacing": 1.0
+        "margins": [7, 10, 10, 10], "line_spacing": 1.0,
+        "skip_warning_overflowed": true
         }, 
     "elements": [
                     {
@@ -148,7 +149,8 @@ config:
     "margins": [float, float, float, float],
     "head_page": paragraph,
     "head_page_count", paragraph,
-    "deafault_font_size" int
+    "deafault_font_size" int,
+    "skip_warning_overflowed": bool -> Skip the page size exceeded warning when the paragraph exceeds the layout
 }
 ```
 
@@ -172,7 +174,9 @@ style:
     "italic":bool,
     "font_family": string,
     "color": color,
-    "line_spacing": float
+    "line_spacing": float,
+    "size": int,
+    "fit_size_to": int -> auto size to minimum
  }
 ```
 
