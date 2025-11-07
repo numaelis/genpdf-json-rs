@@ -157,14 +157,17 @@ config:
 line_style:
 ```
  {
-    "thickness":float
-    "color":color
+    "thickness":float,
+    "color":color,
+    "dash": int,
+    "top": bool, "right": bool, "bottom": bool, "left": bool (only frame)
  }
+ 
 ```
 
 margins:
 ```
-    [top, right, bottom, left]
+    [top, right, bottom, left]  float or int
 ```
 
 style:
