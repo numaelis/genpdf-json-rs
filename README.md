@@ -159,7 +159,7 @@ line_style:
  {
     "thickness":float,
     "color":color,
-    "dash": int,
+    "dash": int, "gap": int, "dash2": int, "gap2": int,
     "top": bool, "right": bool, "bottom": bool, "left": bool (only frame)
  }
  
