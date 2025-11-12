@@ -1163,7 +1163,8 @@ impl GenpdfJson {
                     "break" => {
                         if let Some(value) = item_obj.get("value").and_then(|v| Some(v.as_f64().unwrap_or(0.0) as f32)) {
                             let element = Break::new(value);
-                            if value > 0.0 {
+                            ///allow line break in negative
+                            // if value > 0.0 {
                                 match root_layout.type_name(){
                                     "NoneLayout" =>{                                                
                                         self.doc.push(element);
@@ -1181,7 +1182,7 @@ impl GenpdfJson {
                                         root_layout.push(element);
                                     }
                                 }
-                            }
+                            // }
                         }
                     }
                     
