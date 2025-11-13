@@ -1385,7 +1385,16 @@ impl GenpdfJson {
                             }else{                                
                                 element = Text::new(value);
                             }
-                        }                                                                                                   
+                        }
+                        if let Some(orphan) = item_obj.get("orphan").and_then(|v| v.as_bool()) {
+                            element.set_orphan(orphan);
+                            if let Some(position) = item_obj.get("position").and_then(|v| v.as_array()) {
+                                let x = position[0].as_f64().unwrap_or(0.0) as f32;
+                                let y = position[1].as_f64().unwrap_or(0.0) as f32;
+                                element.set_orphan_position(x, y);
+                                println!("{},{}",x,y);
+                            }
+                        }
                         // // top, right, bottom, left
                         let paddings = self.get_paddings(item_obj);                        
                         let element = PaddedElement::new(
