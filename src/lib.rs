@@ -1392,7 +1392,6 @@ impl GenpdfJson {
                                 let x = position[0].as_f64().unwrap_or(0.0) as f32;
                                 let y = position[1].as_f64().unwrap_or(0.0) as f32;
                                 element.set_orphan_position(x, y);
-                                println!("{},{}",x,y);
                             }
                         }
                         // // top, right, bottom, left

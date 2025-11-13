@@ -268,6 +268,13 @@ elements
  }
  
  {
+    "type": text,
+    "value": string_style,
+    "orphan": bool,
+    "position": [float, float]
+ }
+ 
+ {
     "type": image,
     "path": string,
     "base64": string,
