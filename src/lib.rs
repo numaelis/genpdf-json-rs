@@ -1,5 +1,5 @@
 use rckive_genpdf::{
-    elements, fonts, style, PaperSize, Margins, Alignment, Element, elements::{Paragraph, IntoBoxedElement, Text, PaddedElement, TableLayout, FrameCellDecorator, LinearLayout, OrderedList, UnorderedList, BulletPoint, Break, PageBreak, Image},
+    elements, fonts, style, PaperSize, Margins, Alignment, Element, elements::{Paragraph, IntoBoxedElement, Text, PaddedElement, TableLayout, FrameCellDecorator, LinearLayout, OrderedList, UnorderedList, BulletPoint, Break, PageBreak},
 };
 
 use rckive_genpdf::fonts::{FontFamily, Font, FontData};
@@ -264,18 +264,32 @@ impl GenpdfJson {
         doc.set_line_spacing(config_line_spacing);  
         
         let mut decorator = rckive_genpdf::SimplePageDecorator::new();
-        
+        let mut _top_margin = 0.0;
+        let mut _bottom_margin = 0.0;
+        let mut _left_margin = 0.0;
+        let mut _right_margin = 0.0;
         if let Some(margins) = json_config.get("margins").and_then(|v| v.as_array()){
             let t = margins[0].as_f64().unwrap_or(0.0) as f32;
             let r = margins[1].as_f64().unwrap_or(0.0) as f32;
             let b = margins[2].as_f64().unwrap_or(0.0) as f32;
             let l = margins[3].as_f64().unwrap_or(0.0) as f32;
             decorator.set_margins(Margins::trbl(t,r,b,l));
+            _top_margin = t.clone();
+            _bottom_margin = b.clone();
+            _left_margin = l.clone();
+            _right_margin = r.clone();
         }else{
             if let Some(margins) = json_config.get("margins").and_then(|v| Some(v.as_f64().unwrap() as f32)){
                 decorator.set_margins(margins);
+                _top_margin = margins.clone();
+                _bottom_margin = margins.clone();
+                _left_margin = margins.clone();
+                _right_margin = margins.clone();
             }
         }            
+        
+        // Allow the use of 3 paragraphs in the page header.
+        // It is not possible to dynamically include a layout within the footer or page header because it is necessary to implement `clone` in the layout.
         
         let mut page_count_text = "".to_string();
         let mut page_count_alignment = Alignment::Left;
@@ -283,26 +297,62 @@ impl GenpdfJson {
         
         let mut font_size = 9;
         
-        let mut head_page_text = "".to_string();
-        let mut head_page_alignment = Alignment::Left;
-        let mut head_page_style = style::Style::new();
+        let mut count_head_paragraph = 0;
+        // let mut head_page_style = style::Style::new();
                 
-        // let mut head_element = Paragraph::default();
-        if let Some(head_page) = json_config.get("head_page") {
-            if let Some(alignment) = head_page.get("alignment").and_then(|v| v.as_str()) {
-                head_page_alignment = *alignment_map.get(alignment).unwrap();
-            }             
-            if let Some(value) = head_page.get("value").and_then(|v| v.as_array()) {
-                for val_style in value {      
-                    head_page_style = get_head_style(&val_style, &fcache);                                
-                    if let Some(text) = val_style.get("text").and_then(|v| v.as_str()) {                        
-                        head_page_text = text.to_string();
-                    }                                
+        let mut head_paragraph_0 = Paragraph::default();
+        let mut head_paragraph_1 = Paragraph::default();
+        let mut head_paragraph_2 = Paragraph::default();
+        
+        if let Some(head_page) = json_config.get("head_page").and_then(|v| v.as_array()){
+            for para in head_page {
+                if count_head_paragraph > 2 { break; }
+                if let Some(alignment) = para.get("alignment").and_then(|v| v.as_str()) {
+                    if count_head_paragraph == 0 {
+                        head_paragraph_0.set_alignment(*alignment_map.get(alignment).unwrap());
+                    }
+                    if count_head_paragraph == 1 {
+                        head_paragraph_1.set_alignment(*alignment_map.get(alignment).unwrap());
+                    }
+                    if count_head_paragraph == 2 {
+                        head_paragraph_2.set_alignment(*alignment_map.get(alignment).unwrap());
+                    }                    
+                }
+                if let Some(value) = para.get("value").and_then(|v| v.as_array()) {
+                    for val_style in value {      
+                        let head_page_style = get_head_style(&val_style, &fcache);                                
+                        if let Some(text) = val_style.get("text").and_then(|v| v.as_str()) {                            
+                            if count_head_paragraph == 0 {
+                                head_paragraph_0.push_styled(text, head_page_style);
+                            }
+                            if count_head_paragraph == 1 {
+                                head_paragraph_1.push_styled(text, head_page_style);
+                            }
+                            if count_head_paragraph == 2 {
+                                head_paragraph_2.push_styled(text, head_page_style);
+                            }
+                        }                                
+                    }
+                }
+                count_head_paragraph +=1;
+            }
+        }else{
+            if let Some(head_page) = json_config.get("head_page") {
+                count_head_paragraph +=1;
+                if let Some(alignment) = head_page.get("alignment").and_then(|v| v.as_str()) {
+                    head_paragraph_0.set_alignment(*alignment_map.get(alignment).unwrap());                    
+                }             
+                if let Some(value) = head_page.get("value").and_then(|v| v.as_array()) {
+                    for val_style in value {      
+                        let head_page_style = get_head_style(&val_style, &fcache);                                
+                        if let Some(text) = val_style.get("text").and_then(|v| v.as_str()) {   
+                            head_paragraph_0.push_styled(text, head_page_style);
+                        }                                
+                    }
                 }
             }
         }
-        
-        // let mut head_element = Paragraph::default();
+                
         if let Some(head_page_count) = json_config.get("head_page_count") {
             if let Some(alignment) = head_page_count.get("alignment").and_then(|v| v.as_str()) {
                 page_count_alignment = *alignment_map.get(alignment).unwrap();
@@ -315,19 +365,27 @@ impl GenpdfJson {
                     }                                
                 }
             }
-        }                
+        }       
                 
         if let Some(deafault_font_size) = json_config.get("deafault_font_size").and_then(|v| Some(v.as_f64().unwrap_or(9.0) as u8)) { 
             font_size = deafault_font_size;
         }
-               
-        decorator.set_header(move |page| {
-            let mut layout = elements::LinearLayout::vertical();
-            if head_page_text != "".to_string() {
-                layout.push(
-                    elements::Paragraph::new(format!("{} ",head_page_text)).aligned(head_page_alignment).styled(head_page_style),
-                );
                 
+        decorator.set_header( move |page|{
+            
+            let mut layout = elements::LinearLayout::vertical();
+            
+            if count_head_paragraph > 0 {  
+                let head_paragraph_0 = head_paragraph_0.clone();
+                layout.push(head_paragraph_0);
+                if count_head_paragraph > 1 {
+                    let head_paragraph_1 = head_paragraph_1.clone();
+                    layout.push(head_paragraph_1);
+                }
+                if count_head_paragraph > 2 {
+                    let head_paragraph_2 = head_paragraph_2.clone();
+                    layout.push(head_paragraph_2);
+                }
                 layout.push(elements::Break::new(1.));
             }
             if page > 1 && page_count_text!= "".to_string()  {
@@ -339,33 +397,138 @@ impl GenpdfJson {
             layout.styled(style::Style::new())
         });
         
-        doc.set_page_decorator(decorator);
+        let mut _height = 0.0;
+        let mut _widht = 0.0;
         
         doc.set_font_size(font_size);                               
         
         if let Some(page_size) = json_config.get("page_size").and_then(|v| v.as_array()) { 
             if page_size.len()>=2 {
                 let width = page_size[0].as_f64().unwrap_or(0.0) as f32;
-                    let height = page_size[1].as_f64().unwrap_or(0.0) as f32;
-                    doc.set_paper_size(rckive_genpdf::Size::new(width, height));
+                let height = page_size[1].as_f64().unwrap_or(0.0) as f32;
+                doc.set_paper_size(rckive_genpdf::Size::new(width, height));
+                _height = height.clone();
+                _widht = width.clone();
             }            
         }else{
             if let Some(page_size) = json_config.get("page_size").and_then(|v| v.as_str()) { 
                 match page_size {
                     "A4" => {
                         doc.set_paper_size(PaperSize::A4);
+                        _height = 297.0;
+                        _widht = 210.0;
                     }
                     "Legal" => {
                         doc.set_paper_size(PaperSize::Legal);
+                        _height = 356.0;
+                        _widht = 216.0;
                     }
                     "Letter" => {
                         doc.set_paper_size(PaperSize::Letter);
+                        _height = 279.0;
+                        _widht = 216.0;
                     }
                     _ =>{
                     }
                 }
             }
         }
+        
+        // Allow the use of 3 paragraphs in the footer.
+        // It is not possible to dynamically include a layout within the footer or page header because it is necessary to implement `clone` in the layout.
+        let x = 0;
+        let mut y = _height - _bottom_margin; //_top_margin - 
+        
+        let mut count_footer_paragraph = 0;       
+                
+        let mut footer_paragraph_0 = Paragraph::default();
+        let mut footer_paragraph_1 = Paragraph::default();
+        let mut footer_paragraph_2 = Paragraph::default();
+        
+        if let Some(footer_page) = json_config.get("footer_page").and_then(|v| v.as_array()){
+            for para in footer_page {
+                if count_footer_paragraph > 2 { break; }
+                if let Some(alignment) = para.get("alignment").and_then(|v| v.as_str()) {
+                    if count_footer_paragraph == 0 {
+                        footer_paragraph_0.set_alignment(*alignment_map.get(alignment).unwrap());
+                    }
+                    if count_footer_paragraph == 1 {
+                        footer_paragraph_1.set_alignment(*alignment_map.get(alignment).unwrap());
+                    }
+                    if count_footer_paragraph == 2 {
+                        footer_paragraph_2.set_alignment(*alignment_map.get(alignment).unwrap());
+                    }                    
+                }
+                if let Some(value) = para.get("value").and_then(|v| v.as_array()) {
+                    for val_style in value {      
+                        let footer_page_style = get_head_style(&val_style, &fcache);                                
+                        if let Some(text) = val_style.get("text").and_then(|v| v.as_str()) {                            
+                            if count_footer_paragraph == 0 {
+                                // footer_page_style_0 = footer_page_style.clone();
+                                footer_paragraph_0.push_styled(text, footer_page_style);
+                            }
+                            if count_footer_paragraph == 1 {
+                                // footer_page_style_1 = footer_page_style.clone();
+                                footer_paragraph_1.push_styled(text, footer_page_style);
+                            }
+                            if count_footer_paragraph == 2 {
+                                // footer_page_style_2 = footer_page_style.clone();
+                                footer_paragraph_2.push_styled(text, footer_page_style);
+                            }
+                        }                                
+                    }
+                }
+                count_footer_paragraph +=1;
+            }
+        }        
+        let width_area =  _widht - _left_margin - _right_margin;                
+        if count_footer_paragraph > 0 {  
+            let line_off = config_line_spacing.clone();
+            let mut hei0 = footer_paragraph_0.get_height(doc.context(), width_area);
+            
+            if count_footer_paragraph > 1 {
+                hei0 += footer_paragraph_1.get_height(doc.context(), width_area);   
+                // line_off += config_line_spacing.clone();
+            }
+            if count_footer_paragraph > 2 {
+                hei0 += footer_paragraph_2.get_height(doc.context(), width_area);
+            }
+            let hei0: f32 = hei0.into();
+            y -= hei0;
+                        
+            let off_bottom_margin = hei0.clone() - line_off;
+            decorator.set_margins(Margins::trbl(_top_margin, _right_margin, _bottom_margin + off_bottom_margin, _left_margin));
+        }
+        
+        decorator.set_footer( move |page|{     
+            
+            let mut layout = elements::LinearLayout::vertical().with_orphan(true);
+            
+            layout.set_orphan_position(x, y);
+            if count_footer_paragraph > 0 && width_area > 10.0{  
+                let footer_paragraph_0 = footer_paragraph_0.clone();
+                layout.push(footer_paragraph_0);
+                if count_footer_paragraph > 1 {
+                    let footer_paragraph_1 = footer_paragraph_1.clone();
+                    layout.push(footer_paragraph_1);
+                }
+                if count_footer_paragraph > 2 {
+                    let footer_paragraph_2 = footer_paragraph_2.clone();
+                    layout.push(footer_paragraph_2);
+                }
+                layout.push(elements::Break::new(1.));
+            }
+            // TODO page count in footer
+            // if page > 1 && page_count_text!= "".to_string()  {
+            //     layout.push(
+            //         elements::Paragraph::new(format!("{} {}",page_count_text, page)).aligned(page_count_alignment).styled(page_count_style),
+            //     );
+            //     layout.push(elements::Break::new(1.));
+            // }
+            layout.styled(style::Style::new())
+        });
+        
+        doc.set_page_decorator(decorator);
                    
        //Enabling hyphenation helps with word wrapping, but not all words. This needs to be improved.
         use hyphenation::Load;
@@ -382,8 +545,7 @@ impl GenpdfJson {
             font_cache: fcache,
             db_path,
         }
-    }    
-    
+    }
     
     fn render_json_file(mut self, json_obj: &serde_json::Value, path: impl AsRef<path::Path>) -> Result<(), Box<dyn std::error::Error>> {
         self.push_elements(json_obj)?;
@@ -429,6 +591,18 @@ impl GenpdfJson {
                 let mut none_ = NoneLayout{root:0};
                 self.push_element(element, &mut none_)?;
             }
+        }
+        Ok(())
+    }   
+    
+    fn extra_push(&mut self, json_obj: &serde_json::Value) -> Result<(), Box<dyn std::error::Error>> {
+        if let Some(elements) = json_obj.get("extra_elements").and_then(|v| v.as_array()) {
+            let mut _layout = LinearLayout::vertical();
+            let mut layout = LLayout{root:_layout};
+            for element in elements {                
+                self.push_element(element, &mut layout)?;
+            }
+            self.doc.extra_push(layout.root);
         }
         Ok(())
     }   
@@ -670,6 +844,16 @@ impl GenpdfJson {
                                     mstyle = self.get_style(&style);                                       
                                 }
                                 let mut _layout = LinearLayout::vertical();
+                                
+                                if let Some(orphan) = item_obj.get("orphan").and_then(|v| v.as_bool()) {
+                                    _layout.set_orphan(orphan);
+                                    if let Some(position) = item_obj.get("position").and_then(|v| v.as_array()) {
+                                        let x = position[0].as_f64().unwrap_or(0.0) as f32;
+                                        let y = position[1].as_f64().unwrap_or(0.0) as f32;
+                                        _layout.set_orphan_position(x, y);
+                                    }
+                                }
+                        
                                 let mut layout = LLayout{root:_layout};
                                 if let Some(elements) = item_obj.get("elements").and_then(|v| v.as_array()) {
                                     for element in elements {
@@ -783,9 +967,7 @@ impl GenpdfJson {
                                         _horizontal_layout.set_cell_decorator(FrameCellDecorator::new(false,false,false));  
                                         
                                         let mut frame_thickness = 0.1;
-                                        let mut frame_color = style::Color::Rgb(0,0,0);
-                                        let (mut frame_dash, mut frame_gap, mut frame_dash2, mut frame_gap2) = (0, 0, 0, 0);
-                                        // let (mut ftop, mut fright, mut fbottom, mut fleft) = (true, true, true, true);
+                                        let mut frame_color = style::Color::Rgb(0,0,0);                                        
                                         if let Some(frame) = item_obj.get("frame").and_then(|v| v.as_object()) {
                                             if let Some(thickness)= frame.get("thickness").and_then(|v| Some(v.as_f64().unwrap_or(0.0) as f32)){
                                                 frame_thickness = thickness;
@@ -793,7 +975,7 @@ impl GenpdfJson {
                                             if let Some(color) = frame.get("color"){
                                                 frame_color = get_color(color);
                                             }
-                                            (frame_dash, frame_gap, frame_dash2, frame_gap2) = self.get_dashes(frame);
+                                            let (frame_dash, frame_gap, frame_dash2, frame_gap2) = self.get_dashes(frame);
                                             _horizontal_layout.set_cell_decorator(FrameCellDecorator::with_line_style(false,true,false, 
                                                                                                                         style::LineStyle::new()
                                                                                                                         .with_thickness(frame_thickness)
@@ -872,9 +1054,7 @@ impl GenpdfJson {
                                 _table_layout.set_cell_decorator(FrameCellDecorator::new(list_decorador[0],list_decorador[1],list_decorador[2]));
                                 
                                 let mut frame_thickness = 0.1;
-                                let mut frame_color = style::Color::Rgb(0,0,0);
-                                let (mut frame_dash, mut frame_gap, mut frame_dash2, mut frame_gap2) = (0, 0, 0, 0);
-                                // let (mut ftop, mut fright, mut fbottom, mut fleft) = (true, true, true, true);
+                                let mut frame_color = style::Color::Rgb(0,0,0);                                
                                 if let Some(frame) = item_obj.get("frame").and_then(|v| v.as_object()) {
                                     if let Some(thickness)= frame.get("thickness").and_then(|v| Some(v.as_f64().unwrap_or(0.0) as f32)){
                                         frame_thickness = thickness;
@@ -882,7 +1062,7 @@ impl GenpdfJson {
                                     if let Some(color) = frame.get("color"){
                                         frame_color = get_color(color);
                                     }                                    
-                                    (frame_dash, frame_gap, frame_dash2, frame_gap2) = self.get_dashes(frame);
+                                    let (frame_dash, frame_gap, frame_dash2, frame_gap2) = self.get_dashes(frame);
                                     _table_layout.set_cell_decorator(FrameCellDecorator::with_line_style(list_decorador[0],list_decorador[1],list_decorador[2], 
                                                                                                                 style::LineStyle::new()
                                                                                                                 .with_thickness(frame_thickness)
@@ -1163,7 +1343,7 @@ impl GenpdfJson {
                     "break" => {
                         if let Some(value) = item_obj.get("value").and_then(|v| Some(v.as_f64().unwrap_or(0.0) as f32)) {
                             let element = Break::new(value);
-                            ///allow line break in negative
+                            //allow line break in negative
                             // if value > 0.0 {
                                 match root_layout.type_name(){
                                     "NoneLayout" =>{                                                
@@ -1449,7 +1629,8 @@ pub fn render_json_file(json_path: impl AsRef<path::Path>, path: impl AsRef<path
         }
         
         println!("init ...");
-        let genpdf = GenpdfJson::new(&config_default, "");    
+        let mut genpdf = GenpdfJson::new(&config_default, "");  
+        genpdf.extra_push(&config_default)?;
         genpdf.render_json_file(&json_value, path)?;
         println!("generated successfully");
         Ok(())
@@ -1468,7 +1649,8 @@ pub fn render_json_base64(json_string: &String) -> Result<String, Box<dyn std::e
         if let Some(config) = json_value.get("config") {
             config_default = config.clone();        
         }        
-        let genpdf = GenpdfJson::new(&config_default, "");    
+        let mut genpdf = GenpdfJson::new(&config_default, "");
+        genpdf.extra_push(&config_default)?;
         let result = genpdf.render_json_base64(&json_value)?;        
         Ok(result)
     }
@@ -1494,7 +1676,8 @@ pub fn render_file_from_sqlite(db_path: impl AsRef<path::Path>, path: impl AsRef
         }    
                 
         println!("init ...");
-        let genpdf = GenpdfJson::new(&config_default, &db_path);    
+        let mut genpdf = GenpdfJson::new(&config_default, &db_path); 
+        genpdf.extra_push(&config_default)?;
         genpdf.render_file_from_sqlite(&db_path, path)?;
         println!("generated successfully");
         Ok(())
@@ -1518,7 +1701,8 @@ pub fn render_base64_from_sqlite(db_path: impl AsRef<path::Path>) -> Result<Stri
             let data_string: String = row.get("data")?;
             config_default = serde_json::from_str(&data_string)?;
         }          
-    let genpdf = GenpdfJson::new(&config_default, &db_path);    
+    let mut genpdf = GenpdfJson::new(&config_default, &db_path);
+    genpdf.extra_push(&config_default)?;
     let result = genpdf.render_base64_from_sqlite(&db_path)?;        
     Ok(result)
 }    
