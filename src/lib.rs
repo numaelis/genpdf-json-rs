@@ -1706,3 +1706,5 @@ pub fn render_base64_from_sqlite(db_path: impl AsRef<path::Path>) -> Result<Stri
     let result = genpdf.render_base64_from_sqlite(&db_path)?;        
     Ok(result)
 }    
+
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
