@@ -223,7 +223,7 @@ fn get_head_style(val_style: &serde_json::Value, font_cache: &HashMap<String, Fo
     }    
     return mstyle;
 }
-    
+/// GenpdfJson
 impl GenpdfJson {
     fn new(json_config: &serde_json::Value, db_path: impl AsRef<path::Path>) -> Self {        
         let mut alignment_map = HashMap::new();
@@ -1612,7 +1612,7 @@ impl GenpdfJson {
          Ok(())
     }    
 }
-
+/// render file pdf from file json
 pub fn render_json_file(json_path: impl AsRef<path::Path>, path: impl AsRef<path::Path>) -> Result<(), Box<dyn std::error::Error>> {
         let mut config_default = json!({        
                 "fonts":[
@@ -1620,7 +1620,8 @@ pub fn render_json_file(json_path: impl AsRef<path::Path>, path: impl AsRef<path
                 ],
                 "title": "Report GenPdfJson",
                 "default_font":{"font_family_name":"LiberationSans",  "dir":"/usr/share/fonts/truetype/liberation"},
-                "margins":10                
+                "margins":10,
+                "skip_warning_overflowed": true               
         });
         let json_string = fs::read_to_string(json_path)?;
         let json_value: Value = serde_json::from_str(&json_string)?;
@@ -1635,7 +1636,7 @@ pub fn render_json_file(json_path: impl AsRef<path::Path>, path: impl AsRef<path
         println!("generated successfully");
         Ok(())
     }
-    
+/// render pdf in memory and return string base64 from file json
 pub fn render_json_base64(json_string: &String) -> Result<String, Box<dyn std::error::Error>> {
         let mut config_default = json!({        
                 "fonts":[
@@ -1643,7 +1644,8 @@ pub fn render_json_base64(json_string: &String) -> Result<String, Box<dyn std::e
                 ],
                 "title": "Report GenPdfJson",
                 "default_font":{"font_family_name":"LiberationSans",  "dir":"/usr/share/fonts/truetype/liberation"},
-                "margins":10
+                "margins":10,
+                "skip_warning_overflowed": true
         });      
         let json_value: Value = serde_json::from_str(&json_string)?;
         if let Some(config) = json_value.get("config") {
@@ -1654,7 +1656,7 @@ pub fn render_json_base64(json_string: &String) -> Result<String, Box<dyn std::e
         let result = genpdf.render_json_base64(&json_value)?;        
         Ok(result)
     }
-
+/// render file pdf from sqlite .db
 pub fn render_file_from_sqlite(db_path: impl AsRef<path::Path>, path: impl AsRef<path::Path>) -> Result<(), Box<dyn std::error::Error>> {
         let mut config_default = json!({        
                 "fonts":[
@@ -1682,7 +1684,7 @@ pub fn render_file_from_sqlite(db_path: impl AsRef<path::Path>, path: impl AsRef
         println!("generated successfully");
         Ok(())
 }
-
+/// render pdf in memory and return string base64 from sqlite .db
 pub fn render_base64_from_sqlite(db_path: impl AsRef<path::Path>) -> Result<String, Box<dyn std::error::Error>> {
     let mut config_default = json!({        
             "fonts":[
@@ -1706,5 +1708,5 @@ pub fn render_base64_from_sqlite(db_path: impl AsRef<path::Path>) -> Result<Stri
     let result = genpdf.render_base64_from_sqlite(&db_path)?;        
     Ok(result)
 }    
-
+/// Read the version from build
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
