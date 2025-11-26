@@ -147,9 +147,10 @@ config:
     "default_font": {"font_family_name":"", dir:""}
     "line_spacing": float,
     "margins": [float, float, float, float],
-    "head_page": paragraph,
-    "head_page_count", paragraph,
-    "deafault_font_size" int,
+    "head_page": paragraph, or [paragraph, paragraph, paragraph] maximum 3 paragraphs
+    "footer_page": [paragraph, paragraph, paragraph] maximum 3 paragraphs
+    "head_page_count": paragraph,
+    "deafault_font_size": int,
     "skip_warning_overflowed": bool -> Skip the page size exceeded warning when the paragraph exceeds the layout
 }
 ```
@@ -216,6 +217,8 @@ elements
     "frame": line_style,
     "style": style,
     "padding": margins,
+    "orphan": bool,
+    "position": [float, float],
     "elements": [...elements...]
  }
  
@@ -226,17 +229,17 @@ elements
     "frame": line_style,
     "style": style,
     "padding": margins,
-    "elements": [...elements column_weights...] -> 
+    "elements": [...elements column_weights.len()...] -> 
  }
  
  {
     "type": table_layout,
     "frame_decorator":[[inner(bool), outer(bool), cont(bool)], line_style]
-    "column_weights": [],
+    "column_weights": [], array of integers
     "frame": line_style,
     "style": style,
     "padding": margins,
-    "rows": [...row column_weights...] -> 
+    "rows": [...rows column_weights.len()...] -> 
  }
  
  {
@@ -289,7 +292,7 @@ elements
  
  {
     "type" : "break", 
-    "value": float
+    "value": float, Negative values ​​are allowed
  }
  
  {  
