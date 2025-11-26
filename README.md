@@ -205,7 +205,7 @@ string_style:
 
 color:
 ```
-    {"type":"rgb", "value":[int, int, int]}
+    {"type":"rgb", "value":[int, int, int]} 0 - 255
     {"type":"cmyk", "value":[int, int, int, int]}
     {"type":"greyscale", "value":int}
 ```
@@ -225,7 +225,7 @@ elements
  {
     "type": layout,
     "orientation":"horizontal"
-    "column_weights": [],
+    "column_weights": [], array of integers
     "frame": line_style,
     "style": style,
     "padding": margins,
