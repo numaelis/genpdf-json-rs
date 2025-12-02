@@ -161,7 +161,9 @@ line_style:
     "thickness":float,
     "color":color,
     "dash": int, "gap": int, "dash2": int, "gap2": int,
-    "top": bool, "right": bool, "bottom": bool, "left": bool (only frame)
+    "top": bool, "right": bool, "bottom": bool, "left": bool (only frame),
+    "background": bool, (only frame)
+    "background_color": color, (only frame)
  }
  
 ```
