@@ -706,31 +706,34 @@ impl GenpdfJson {
                                                                                 frame_color: style::Color, frame_dash: i64, 
                                                                                 frame_gap: i64, frame_dash2: i64, frame_gap2: i64,
                                                                                 ftop: bool, fright: bool, fbottom: bool, fleft: bool,
+                                                                                has_background: bool, background_color: style::Color,
                                                                                 bullet: &str) -> Result<(), Box<dyn std::error::Error>> {
         match root_layout.type_name(){
             "NoneLayout" =>{
                 if bullet != "" {
                     if has_frame{
-                        let nlayout = elements::FramedElement::with_line_style_trbl(element,
+                        let nlayout = elements::FramedElement::with_line_style_trbl_and_background(element,
                                                                                 style::LineStyle::new()
                                                                                 .with_thickness(frame_thickness)
                                                                                 .with_color(frame_color)
                                                                                 .with_dash(frame_dash).with_dash2(frame_dash2)
                                                                                 .with_gap(frame_gap).with_gap2(frame_gap2),
-                                                                                    ftop, fright, fbottom, fleft);
+                                                                                    ftop, fright, fbottom, fleft,   
+                                                                                has_background, style::BackgroundStyle::new().with_color(background_color));
                         self.doc.push(BulletPoint::new(nlayout).with_bullet(bullet));                                     
                     }else{
                         self.doc.push(BulletPoint::new(element).with_bullet(bullet)); 
                     }                                                                        
                 }else{
                     if has_frame{
-                        let nlayout = elements::FramedElement::with_line_style_trbl(element,
+                        let nlayout = elements::FramedElement::with_line_style_trbl_and_background(element,
                                                                                 style::LineStyle::new()
                                                                                 .with_thickness(frame_thickness)
                                                                                 .with_color(frame_color)
                                                                                 .with_dash(frame_dash).with_dash2(frame_dash2)
                                                                                 .with_gap(frame_gap).with_gap2(frame_gap2),
-                                                                                    ftop, fright, fbottom, fleft);
+                                                                                    ftop, fright, fbottom, fleft,   
+                                                                                has_background, style::BackgroundStyle::new().with_color(background_color));
                         self.doc.push(nlayout);                                     
                     }else{
                         self.doc.push(element);
@@ -740,26 +743,28 @@ impl GenpdfJson {
             "StaticList" =>{
                 if bullet != "" {
                     if has_frame{
-                        let nlayout = elements::FramedElement::with_line_style_trbl(element,
+                        let nlayout = elements::FramedElement::with_line_style_trbl_and_background(element,
                                                                                 style::LineStyle::new()
                                                                                 .with_thickness(frame_thickness)
                                                                                 .with_color(frame_color)
                                                                                 .with_dash(frame_dash).with_dash2(frame_dash2)
                                                                                 .with_gap(frame_gap).with_gap2(frame_gap2),
-                                                                                    ftop, fright, fbottom, fleft);
+                                                                                    ftop, fright, fbottom, fleft,   
+                                                                                has_background, style::BackgroundStyle::new().with_color(background_color));
                         root_layout.push_static(BulletPoint::new(nlayout).with_bullet(bullet));                                     
                     }else{
                         root_layout.push_static(BulletPoint::new(element).with_bullet(bullet));
                     }                                      
                 }else{
                     if has_frame{
-                        let nlayout = elements::FramedElement::with_line_style_trbl(element,
+                        let nlayout = elements::FramedElement::with_line_style_trbl_and_background(element,
                                                                                 style::LineStyle::new()
                                                                                 .with_thickness(frame_thickness)
                                                                                 .with_color(frame_color)
                                                                                 .with_dash(frame_dash).with_dash2(frame_dash2)
                                                                                 .with_gap(frame_gap).with_gap2(frame_gap2),
-                                                                                    ftop, fright, fbottom, fleft);
+                                                                                    ftop, fright, fbottom, fleft,   
+                                                                                has_background, style::BackgroundStyle::new().with_color(background_color));
                         root_layout.push_static(nlayout);                                      
                     }else{
                         root_layout.push_static(element);
@@ -772,26 +777,28 @@ impl GenpdfJson {
             "VecLayout" =>{
                 if bullet != "" {                                    
                     if has_frame{
-                        let nlayout = elements::FramedElement::with_line_style_trbl(element,
+                        let nlayout = elements::FramedElement::with_line_style_trbl_and_background(element,
                                                                                 style::LineStyle::new()
                                                                                 .with_thickness(frame_thickness)
                                                                                 .with_color(frame_color)
                                                                                 .with_dash(frame_dash).with_dash2(frame_dash2)
                                                                                 .with_gap(frame_gap).with_gap2(frame_gap2),
-                                                                                    ftop, fright, fbottom, fleft);
+                                                                                    ftop, fright, fbottom, fleft,   
+                                                                                has_background, style::BackgroundStyle::new().with_color(background_color));
                         root_layout.push_cell(Box::new(BulletPoint::new(nlayout).with_bullet(bullet)));                                      
                     }else{
                         root_layout.push_cell(Box::new(BulletPoint::new(element).with_bullet(bullet)));
                     }
                 }else{
                     if has_frame{
-                        let nlayout = elements::FramedElement::with_line_style_trbl(element,
+                        let nlayout = elements::FramedElement::with_line_style_trbl_and_background(element,
                                                                                 style::LineStyle::new()
                                                                                 .with_thickness(frame_thickness)
                                                                                 .with_color(frame_color)
                                                                                 .with_dash(frame_dash).with_dash2(frame_dash2)
                                                                                 .with_gap(frame_gap).with_gap2(frame_gap2),
-                                                                                    ftop, fright, fbottom, fleft);
+                                                                                    ftop, fright, fbottom, fleft,   
+                                                                                has_background, style::BackgroundStyle::new().with_color(background_color));
                         root_layout.push_cell(Box::new(nlayout));                                        
                     }else{
                         root_layout.push_cell(Box::new(element));
@@ -801,26 +808,28 @@ impl GenpdfJson {
             _ => {
                 if bullet != "" {
                     if has_frame{
-                        let nlayout = elements::FramedElement::with_line_style_trbl(element,
+                        let nlayout = elements::FramedElement::with_line_style_trbl_and_background(element,
                                                                                 style::LineStyle::new()
                                                                                 .with_thickness(frame_thickness)
                                                                                 .with_color(frame_color)
                                                                                 .with_dash(frame_dash).with_dash2(frame_dash2)
                                                                                 .with_gap(frame_gap).with_gap2(frame_gap2),
-                                                                                    ftop, fright, fbottom, fleft);
+                                                                                    ftop, fright, fbottom, fleft,   
+                                                                                has_background, style::BackgroundStyle::new().with_color(background_color));
                         root_layout.push(BulletPoint::new(nlayout).with_bullet(bullet));                                              
                     }else{
                         root_layout.push(BulletPoint::new(element).with_bullet(bullet));       
                     }                                                                       
                 }else{
                     if has_frame{
-                        let nlayout = elements::FramedElement::with_line_style_trbl(element,
+                        let nlayout = elements::FramedElement::with_line_style_trbl_and_background(element,
                                                                                 style::LineStyle::new()
                                                                                 .with_thickness(frame_thickness)
                                                                                 .with_color(frame_color)
                                                                                 .with_dash(frame_dash).with_dash2(frame_dash2)
                                                                                 .with_gap(frame_gap).with_gap2(frame_gap2),
-                                                                                    ftop, fright, fbottom, fleft);
+                                                                                    ftop, fright, fbottom, fleft,  
+                                                                                has_background, style::BackgroundStyle::new().with_color(background_color));
                         root_layout.push(nlayout);                                        
                     }else{
                         root_layout.push(element);
@@ -866,6 +875,7 @@ impl GenpdfJson {
                                 let mut frame_color = style::Color::Rgb(0,0,0);
                                 let (mut frame_dash, mut frame_gap, mut frame_dash2, mut frame_gap2) = (0, 0, 0, 0);
                                 let (mut ftop, mut fright, mut fbottom, mut fleft) = (true, true, true, true);
+                                let (mut has_background, mut background_color) = (false, style::Color::Rgb(255,255,255));
                                 if let Some(frame) = item_obj.get("frame").and_then(|v| v.as_object()) {
                                     if let Some(thickness)= frame.get("thickness").and_then(|v| Some(v.as_f64().unwrap_or(0.0) as f32)){
                                         frame_thickness = thickness;
@@ -875,7 +885,14 @@ impl GenpdfJson {
                                     }                                                                      
                                     (frame_dash, frame_gap, frame_dash2, frame_gap2) = self.get_dashes(frame);
                                     (ftop, fright, fbottom, fleft) = self.get_sides(frame);
-                                    has_frame = true
+                                    has_frame = true;
+                                    
+                                    if let Some(background) = frame.get("background").and_then(|v| v.as_bool()){
+                                        has_background = background;
+                                        if let Some(b_color) = frame.get("background_color"){
+                                            background_color = get_color(b_color);
+                                        }  
+                                    }  
                                 }
                                 let nlayout = layout.root.styled(mstyle);
                                 let paddings = self.get_paddings(item_obj);                        
@@ -886,13 +903,14 @@ impl GenpdfJson {
                                 match root_layout.type_name(){
                                     "NoneLayout" =>{ 
                                         if has_frame{                                            
-                                            let nlayout = elements::FramedElement::with_line_style_trbl(nlayout,
+                                            let nlayout = elements::FramedElement::with_line_style_trbl_and_background(nlayout,
                                                                                                    style::LineStyle::new()
                                                                                                    .with_thickness(frame_thickness)
                                                                                                    .with_color(frame_color)
                                                                                                    .with_dash(frame_dash).with_dash2(frame_dash2)
                                                                                                    .with_gap(frame_gap).with_gap2(frame_gap2),
-                                                                                                        ftop, fright, fbottom, fleft);                                            
+                                                                                                        ftop, fright, fbottom, fleft,  
+                                                                                                    has_background, style::BackgroundStyle::new().with_color(background_color));                                            
                                             self.doc.push(nlayout);
                                         }else{
                                             self.doc.push(nlayout);
@@ -900,13 +918,14 @@ impl GenpdfJson {
                                     }
                                     "StaticList" =>{
                                         if has_frame{
-                                            let nlayout = elements::FramedElement::with_line_style_trbl(nlayout,
+                                            let nlayout = elements::FramedElement::with_line_style_trbl_and_background(nlayout,
                                                                                                    style::LineStyle::new()
                                                                                                    .with_thickness(frame_thickness)
                                                                                                    .with_color(frame_color)
                                                                                                    .with_dash(frame_dash).with_dash2(frame_dash2)
                                                                                                    .with_gap(frame_gap).with_gap2(frame_gap2),
-                                                                                                        ftop, fright, fbottom, fleft); 
+                                                                                                        ftop, fright, fbottom, fleft,  
+                                                                                                    has_background, style::BackgroundStyle::new().with_color(background_color)); 
                                             root_layout.push_static(nlayout);
                                         }else{
                                             root_layout.push_static(nlayout);
@@ -918,13 +937,14 @@ impl GenpdfJson {
                                     }   
                                     "VecLayout" =>{
                                         if has_frame{
-                                            let nlayout = elements::FramedElement::with_line_style_trbl(nlayout,
+                                            let nlayout = elements::FramedElement::with_line_style_trbl_and_background(nlayout,
                                                                                                    style::LineStyle::new()
                                                                                                    .with_thickness(frame_thickness)
                                                                                                    .with_color(frame_color)
                                                                                                    .with_dash(frame_dash).with_dash2(frame_dash2)
                                                                                                    .with_gap(frame_gap).with_gap2(frame_gap2),
-                                                                                                        ftop, fright, fbottom, fleft); 
+                                                                                                        ftop, fright, fbottom, fleft,  
+                                                                                                    has_background, style::BackgroundStyle::new().with_color(background_color)); 
                                             root_layout.push_cell(Box::new(nlayout));
                                         }else{
                                             root_layout.push_cell(Box::new(nlayout));
@@ -932,13 +952,14 @@ impl GenpdfJson {
                                     }
                                     _ => {
                                         if has_frame{
-                                            let nlayout = elements::FramedElement::with_line_style_trbl(nlayout,
+                                            let nlayout = elements::FramedElement::with_line_style_trbl_and_background(nlayout,
                                                                                                    style::LineStyle::new()
                                                                                                    .with_thickness(frame_thickness)
                                                                                                    .with_color(frame_color)
                                                                                                    .with_dash(frame_dash).with_dash2(frame_dash2)
                                                                                                    .with_gap(frame_gap).with_gap2(frame_gap2),
-                                                                                                        ftop, fright, fbottom, fleft); 
+                                                                                                        ftop, fright, fbottom, fleft, 
+                                                                                                    has_background, style::BackgroundStyle::new().with_color(background_color)); 
                                             root_layout.push(nlayout);
                                         }else{
                                             root_layout.push(nlayout);
@@ -1153,6 +1174,7 @@ impl GenpdfJson {
                         let mut frame_color = style::Color::Rgb(0,0,0);
                         let (mut frame_dash, mut frame_gap, mut frame_dash2, mut frame_gap2) = (0, 0, 0, 0);
                         let (mut ftop, mut fright, mut fbottom, mut fleft) = (true, true, true, true);
+                        let (mut has_background, mut background_color) = (false, style::Color::Rgb(255,255,255));
                         if let Some(frame) = item_obj.get("frame").and_then(|v| v.as_object()) {
                             if let Some(thickness)= frame.get("thickness").and_then(|v| Some(v.as_f64().unwrap_or(0.0) as f32)){
                                 frame_thickness = thickness;
@@ -1162,7 +1184,14 @@ impl GenpdfJson {
                             }
                             (frame_dash, frame_gap, frame_dash2, frame_gap2) = self.get_dashes(frame);
                             (ftop, fright, fbottom, fleft) = self.get_sides(frame);
-                            has_frame = true
+                            has_frame = true;
+                            if let Some(background) = frame.get("background").and_then(|v| v.as_bool()){
+                                has_background = background;
+                                if let Some(b_color) = frame.get("background_color"){
+                                    background_color = get_color(b_color);
+                                }  
+                            }
+                            
                         }
                         let mut mstyle = style::Style::new();
                         if let Some(style) = item_obj.get("style") {
@@ -1177,13 +1206,14 @@ impl GenpdfJson {
                         match root_layout.type_name(){
                             "NoneLayout" =>{         
                                 if has_frame{
-                                    let nlayout = elements::FramedElement::with_line_style_trbl(nlayout,
+                                    let nlayout = elements::FramedElement::with_line_style_trbl_and_background(nlayout,
                                                                                             style::LineStyle::new()
                                                                                             .with_thickness(frame_thickness)
                                                                                             .with_color(frame_color)
                                                                                             .with_dash(frame_dash).with_dash2(frame_dash2)
                                                                                             .with_gap(frame_gap).with_gap2(frame_gap2),
-                                                                                                ftop, fright, fbottom, fleft); 
+                                                                                                ftop, fright, fbottom, fleft, 
+                                                                                            has_background, style::BackgroundStyle::new().with_color(background_color)); 
                                     self.doc.push(nlayout);
                                 }else{
                                     self.doc.push(nlayout);
@@ -1191,13 +1221,14 @@ impl GenpdfJson {
                             }
                             "StaticList" =>{
                                 if has_frame{
-                                    let nlayout = elements::FramedElement::with_line_style_trbl(nlayout,
+                                    let nlayout = elements::FramedElement::with_line_style_trbl_and_background(nlayout,
                                                                                             style::LineStyle::new()
                                                                                             .with_thickness(frame_thickness)
                                                                                             .with_color(frame_color)
                                                                                             .with_dash(frame_dash).with_dash2(frame_dash2)
                                                                                             .with_gap(frame_gap).with_gap2(frame_gap2),
-                                                                                                ftop, fright, fbottom, fleft); 
+                                                                                                ftop, fright, fbottom, fleft, 
+                                                                                            has_background, style::BackgroundStyle::new().with_color(background_color)); 
                                     root_layout.push_static(nlayout);
                                 }else{
                                     root_layout.push_static(nlayout);
@@ -1208,13 +1239,14 @@ impl GenpdfJson {
                             }  
                             "VecLayout" =>{
                                 if has_frame{
-                                    let nlayout = elements::FramedElement::with_line_style_trbl(nlayout,
+                                    let nlayout = elements::FramedElement::with_line_style_trbl_and_background(nlayout,
                                                                                             style::LineStyle::new()
                                                                                             .with_thickness(frame_thickness)
                                                                                             .with_color(frame_color)
                                                                                             .with_dash(frame_dash).with_dash2(frame_dash2)
                                                                                             .with_gap(frame_gap).with_gap2(frame_gap2),
-                                                                                                ftop, fright, fbottom, fleft); 
+                                                                                                ftop, fright, fbottom, fleft, 
+                                                                                            has_background, style::BackgroundStyle::new().with_color(background_color)); 
                                     root_layout.push_cell(Box::new(nlayout));
                                 }else{
                                     root_layout.push_cell(Box::new(nlayout));
@@ -1222,13 +1254,14 @@ impl GenpdfJson {
                             }
                             _ => {
                                 if has_frame{
-                                    let nlayout = elements::FramedElement::with_line_style_trbl(nlayout,
+                                    let nlayout = elements::FramedElement::with_line_style_trbl_and_background(nlayout,
                                                                                             style::LineStyle::new()
                                                                                             .with_thickness(frame_thickness)
                                                                                             .with_color(frame_color)
                                                                                             .with_dash(frame_dash).with_dash2(frame_dash2)
                                                                                             .with_gap(frame_gap).with_gap2(frame_gap2),
-                                                                                                ftop, fright, fbottom, fleft); 
+                                                                                                ftop, fright, fbottom, fleft, 
+                                                                                            has_background, style::BackgroundStyle::new().with_color(background_color)); 
                                     root_layout.push(nlayout);
                                 }else{
                                     root_layout.push(nlayout);
@@ -1255,6 +1288,7 @@ impl GenpdfJson {
                         let mut frame_color = style::Color::Rgb(0,0,0);
                         let (mut frame_dash, mut frame_gap, mut frame_dash2, mut frame_gap2) = (0, 0, 0, 0);
                         let (mut ftop, mut fright, mut fbottom, mut fleft) = (true, true, true, true);
+                        let (mut has_background, mut background_color) = (false, style::Color::Rgb(255,255,255));
                         if let Some(frame) = item_obj.get("frame").and_then(|v| v.as_object()) {
                             if let Some(thickness)= frame.get("thickness").and_then(|v| Some(v.as_f64().unwrap_or(0.0) as f32)){
                                 frame_thickness = thickness;
@@ -1264,7 +1298,13 @@ impl GenpdfJson {
                             }
                             (frame_dash, frame_gap, frame_dash2, frame_gap2) = self.get_dashes(frame);
                             (ftop, fright, fbottom, fleft) = self.get_sides(frame);
-                            has_frame = true
+                            has_frame = true;
+                            if let Some(background) = frame.get("background").and_then(|v| v.as_bool()){
+                                has_background = background;
+                                if let Some(b_color) = frame.get("background_color"){
+                                    background_color = get_color(b_color);
+                                }  
+                            }
                         }                        
                         
                         let mut mstyle = style::Style::new();
@@ -1280,13 +1320,14 @@ impl GenpdfJson {
                         match root_layout.type_name(){
                             "NoneLayout" =>{
                                 if has_frame{
-                                    let nlayout = elements::FramedElement::with_line_style_trbl(nlayout,
+                                    let nlayout = elements::FramedElement::with_line_style_trbl_and_background(nlayout,
                                                                                             style::LineStyle::new()
                                                                                             .with_thickness(frame_thickness)
                                                                                             .with_color(frame_color)
                                                                                             .with_dash(frame_dash).with_dash2(frame_dash2)
                                                                                             .with_gap(frame_gap).with_gap2(frame_gap2),
-                                                                                                ftop, fright, fbottom, fleft); 
+                                                                                                ftop, fright, fbottom, fleft, 
+                                                                                            has_background, style::BackgroundStyle::new().with_color(background_color)); 
                                     self.doc.push(nlayout);
                                 }else{
                                     self.doc.push(nlayout);
@@ -1294,13 +1335,14 @@ impl GenpdfJson {
                             }
                             "StaticList" =>{
                                 if has_frame{
-                                    let nlayout = elements::FramedElement::with_line_style_trbl(nlayout,
+                                    let nlayout = elements::FramedElement::with_line_style_trbl_and_background(nlayout,
                                                                                             style::LineStyle::new()
                                                                                             .with_thickness(frame_thickness)
                                                                                             .with_color(frame_color)
                                                                                             .with_dash(frame_dash).with_dash2(frame_dash2)
                                                                                             .with_gap(frame_gap).with_gap2(frame_gap2),
-                                                                                                ftop, fright, fbottom, fleft); 
+                                                                                                ftop, fright, fbottom, fleft, 
+                                                                                            has_background, style::BackgroundStyle::new().with_color(background_color)); 
                                     root_layout.push_static(nlayout);
                                 }else{
                                     root_layout.push_static(nlayout);
@@ -1311,13 +1353,14 @@ impl GenpdfJson {
                             }  
                             "VecLayout" =>{
                                 if has_frame{
-                                    let nlayout = elements::FramedElement::with_line_style_trbl(nlayout,
+                                    let nlayout = elements::FramedElement::with_line_style_trbl_and_background(nlayout,
                                                                                             style::LineStyle::new()
                                                                                             .with_thickness(frame_thickness)
                                                                                             .with_color(frame_color)
                                                                                             .with_dash(frame_dash).with_dash2(frame_dash2)
                                                                                             .with_gap(frame_gap).with_gap2(frame_gap2),
-                                                                                                ftop, fright, fbottom, fleft); 
+                                                                                                ftop, fright, fbottom, fleft, 
+                                                                                            has_background, style::BackgroundStyle::new().with_color(background_color)); 
                                     root_layout.push_cell(Box::new(nlayout));
                                 }else{
                                     root_layout.push_cell(Box::new(nlayout));
@@ -1325,13 +1368,14 @@ impl GenpdfJson {
                             }
                             _ => {
                                 if has_frame{
-                                    let nlayout = elements::FramedElement::with_line_style_trbl(nlayout,
+                                    let nlayout = elements::FramedElement::with_line_style_trbl_and_background(nlayout,
                                                                                             style::LineStyle::new()
                                                                                             .with_thickness(frame_thickness)
                                                                                             .with_color(frame_color)
                                                                                             .with_dash(frame_dash).with_dash2(frame_dash2)
                                                                                             .with_gap(frame_gap).with_gap2(frame_gap2),
-                                                                                                ftop, fright, fbottom, fleft); 
+                                                                                                ftop, fright, fbottom, fleft, 
+                                                                                            has_background, style::BackgroundStyle::new().with_color(background_color)); 
                                     root_layout.push(nlayout);
                                 }else{
                                     root_layout.push(nlayout);
@@ -1421,6 +1465,7 @@ impl GenpdfJson {
                             let mut frame_color = style::Color::Rgb(0,0,0);
                             let (mut frame_dash, mut frame_gap, mut frame_dash2, mut frame_gap2) = (0, 0, 0, 0);
                             let (mut ftop, mut fright, mut fbottom, mut fleft) = (true, true, true, true);
+                            let (mut has_background, mut background_color) = (false, style::Color::Rgb(255,255,255));
                             if let Some(frame) = item_obj.get("frame").and_then(|v| v.as_object()) {
                                 if let Some(thickness)= frame.get("thickness").and_then(|v| Some(v.as_f64().unwrap_or(0.0) as f32)){
                                     frame_thickness = thickness;
@@ -1430,7 +1475,13 @@ impl GenpdfJson {
                                 }
                                 (frame_dash, frame_gap, frame_dash2, frame_gap2) = self.get_dashes(frame);
                                 (ftop, fright, fbottom, fleft) = self.get_sides(frame);
-                                has_frame = true
+                                has_frame = true;
+                                if let Some(background) = frame.get("background").and_then(|v| v.as_bool()){
+                                    has_background = background;
+                                    if let Some(b_color) = frame.get("background_color"){
+                                        background_color = get_color(b_color);
+                                    }  
+                                }
                             }
                             let paddings = self.get_paddings(item_obj);                        
                             let image = PaddedElement::new(
@@ -1440,13 +1491,14 @@ impl GenpdfJson {
                             match root_layout.type_name(){
                                     "NoneLayout" =>{       
                                         if has_frame{
-                                            let nlayout = elements::FramedElement::with_line_style_trbl(image,
+                                            let nlayout = elements::FramedElement::with_line_style_trbl_and_background(image,
                                                                                             style::LineStyle::new()
                                                                                             .with_thickness(frame_thickness)
                                                                                             .with_color(frame_color)
                                                                                             .with_dash(frame_dash).with_dash2(frame_dash2)
                                                                                             .with_gap(frame_gap).with_gap2(frame_gap2),
-                                                                                                ftop, fright, fbottom, fleft); 
+                                                                                                ftop, fright, fbottom, fleft, 
+                                                                                                has_background, style::BackgroundStyle::new().with_color(background_color)); 
                                             self.doc.push(nlayout);
                                         }else{
                                             self.doc.push(image);
@@ -1454,13 +1506,14 @@ impl GenpdfJson {
                                     }
                                     "StaticList" =>{
                                         if has_frame{
-                                            let nlayout = elements::FramedElement::with_line_style_trbl(image,
+                                            let nlayout = elements::FramedElement::with_line_style_trbl_and_background(image,
                                                                                             style::LineStyle::new()
                                                                                             .with_thickness(frame_thickness)
                                                                                             .with_color(frame_color)
                                                                                             .with_dash(frame_dash).with_dash2(frame_dash2)
                                                                                             .with_gap(frame_gap).with_gap2(frame_gap2),
-                                                                                                ftop, fright, fbottom, fleft); 
+                                                                                                ftop, fright, fbottom, fleft, 
+                                                                                                has_background, style::BackgroundStyle::new().with_color(background_color)); 
                                             root_layout.push_static(nlayout);
                                         }else{
                                             root_layout.push_static(image);
@@ -1471,13 +1524,14 @@ impl GenpdfJson {
                                     }  
                                     "VecLayout" =>{
                                         if has_frame{
-                                            let nlayout = elements::FramedElement::with_line_style_trbl(image,
+                                            let nlayout = elements::FramedElement::with_line_style_trbl_and_background(image,
                                                                                             style::LineStyle::new()
                                                                                             .with_thickness(frame_thickness)
                                                                                             .with_color(frame_color)
                                                                                             .with_dash(frame_dash).with_dash2(frame_dash2)
                                                                                             .with_gap(frame_gap).with_gap2(frame_gap2),
-                                                                                                ftop, fright, fbottom, fleft); 
+                                                                                                ftop, fright, fbottom, fleft, 
+                                                                                                has_background, style::BackgroundStyle::new().with_color(background_color)); 
                                             root_layout.push_cell(Box::new(nlayout));
                                         }else{
                                             root_layout.push_cell(Box::new(image));
@@ -1485,13 +1539,14 @@ impl GenpdfJson {
                                     }
                                     _ => {
                                         if has_frame{
-                                            let nlayout = elements::FramedElement::with_line_style_trbl(image,
+                                            let nlayout = elements::FramedElement::with_line_style_trbl_and_background(image,
                                                                                             style::LineStyle::new()
                                                                                             .with_thickness(frame_thickness)
                                                                                             .with_color(frame_color)
                                                                                             .with_dash(frame_dash).with_dash2(frame_dash2)
                                                                                             .with_gap(frame_gap).with_gap2(frame_gap2),
-                                                                                                ftop, fright, fbottom, fleft); 
+                                                                                                ftop, fright, fbottom, fleft, 
+                                                                                            has_background, style::BackgroundStyle::new().with_color(background_color)); 
                                             root_layout.push(nlayout);
                                         }else{
                                             root_layout.push(image);
@@ -1535,6 +1590,7 @@ impl GenpdfJson {
                         let mut frame_color = style::Color::Rgb(0,0,0);
                         let (mut frame_dash, mut frame_gap, mut frame_dash2, mut frame_gap2) = (0, 0, 0, 0);
                         let (mut ftop, mut fright, mut fbottom, mut fleft) = (true, true, true, true);
+                        let (mut has_background, mut background_color) = (false, style::Color::Rgb(255,255,255));
                         if let Some(frame) = item_obj.get("frame").and_then(|v| v.as_object()) {
                             if let Some(thickness)= frame.get("thickness").and_then(|v| Some(v.as_f64().unwrap_or(0.0) as f32)){
                                 frame_thickness = thickness;
@@ -1544,7 +1600,13 @@ impl GenpdfJson {
                             }
                             (frame_dash, frame_gap, frame_dash2, frame_gap2) = self.get_dashes(frame);
                             (ftop, fright, fbottom, fleft) = self.get_sides(frame);
-                            has_frame = true
+                            has_frame = true;
+                            if let Some(background) = frame.get("background").and_then(|v| v.as_bool()){
+                                has_background = background;
+                                if let Some(b_color) = frame.get("background_color"){
+                                    background_color = get_color(b_color);
+                                }  
+                            }
                         }                        
                         let mut bullet = "";
                         if let Some(bullet_point) = item_obj.get("bullet").and_then(|v| v.as_str()) {
@@ -1552,7 +1614,7 @@ impl GenpdfJson {
                         }
                         self.match_text_paragraph(element, root_layout, has_frame,
                                                   frame_thickness, frame_color, frame_dash, frame_gap, 
-                                                  frame_dash2, frame_gap2, ftop, fright, fbottom, fleft,
+                                                  frame_dash2, frame_gap2, ftop, fright, fbottom, fleft, has_background, background_color,
                                                   bullet)?;
                     }
                         
@@ -1585,6 +1647,7 @@ impl GenpdfJson {
                         let mut frame_color = style::Color::Rgb(0,0,0);                        
                         let (mut frame_dash, mut frame_gap, mut frame_dash2, mut frame_gap2) = (0, 0, 0, 0);
                         let (mut ftop, mut fright, mut fbottom, mut fleft) = (true, true, true, true);
+                        let (mut has_background, mut background_color) = (false, style::Color::Rgb(255,255,255));
                         if let Some(frame) = item_obj.get("frame").and_then(|v| v.as_object()) {
                             if let Some(thickness)= frame.get("thickness").and_then(|v| Some(v.as_f64().unwrap_or(0.0) as f32)){
                                 frame_thickness = thickness;
@@ -1594,7 +1657,13 @@ impl GenpdfJson {
                             }
                             (frame_dash, frame_gap, frame_dash2, frame_gap2) = self.get_dashes(frame);
                             (ftop, fright, fbottom, fleft) = self.get_sides(frame);
-                            has_frame = true
+                            has_frame = true;
+                            if let Some(background) = frame.get("background").and_then(|v| v.as_bool()){
+                                has_background = background;
+                                if let Some(b_color) = frame.get("background_color"){
+                                    background_color = get_color(b_color);
+                                }  
+                            }
                         }                      
                         let mut bullet = "";
                         if let Some(bullet_point) = item_obj.get("bullet").and_then(|v| v.as_str()) {
@@ -1602,7 +1671,7 @@ impl GenpdfJson {
                         }
                         self.match_text_paragraph(element, root_layout, has_frame,
                                                   frame_thickness, frame_color, frame_dash, frame_gap, 
-                                                  frame_dash2, frame_gap2, ftop, fright, fbottom, fleft,
+                                                  frame_dash2, frame_gap2, ftop, fright, fbottom, fleft, has_background, background_color,
                                                   bullet)?;
                                               
                     },
