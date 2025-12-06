@@ -178,7 +178,7 @@ style:
  {
     "bold":bool,
     "italic":bool,
-    "font_family": string,
+    "font_family_name": string,
     "color": color,
     "line_spacing": float,
     "size": int,
@@ -199,9 +199,11 @@ string_style:
     "text": string
     "bold":bool,
     "italic":bool,
-    "font_family": string,
+    "font_family_name": string,
     "color": color,
-    "line_spacing": float
+    "line_spacing": float,
+    "size": int,
+    "fit_size_to": int -> auto size to minimum
  }
 ```
 
