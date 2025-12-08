@@ -3,6 +3,7 @@
 - Updating `GenpdfJson` to enable this new improvement.
 - Replaced `with_line_style_trbl` `with with_line_style_trbl_and_background`.
 - Capture JSON values `​​background` and `background_color`.
+- Simplify some code for the match layout, in FrameElement and in background color (default white).
 
 # v0.1.10 (2025-11) 
 - add experimental footer

@@ -157,8 +157,8 @@ fn get_font_default(json_config: &serde_json::Value) -> Result<FontFamily<FontDa
     Err(boxed_error)*/     
 }
 
-fn get_color(val_color: &serde_json::Value) -> style::Color {
-    let mut mcolor = style::Color::Rgb(0,0,0);
+fn _get_color(val_color: &serde_json::Value, default_color: style::Color) -> style::Color {
+    let mut mcolor = default_color;
     if let Some(ctype) = val_color.get("type").and_then(|v| v.as_str()) {
         match ctype {
             "rgb" => {
@@ -190,6 +190,14 @@ fn get_color(val_color: &serde_json::Value) -> style::Color {
         }
     }
     return mcolor;
+}
+
+fn get_background_color(val_color: &serde_json::Value) -> style::Color {
+    return _get_color(val_color, style::Color::Rgb(255,255,255));
+}
+
+fn get_color(val_color: &serde_json::Value) -> style::Color {
+    return _get_color(val_color, style::Color::Rgb(0,0,0));
 }
      
 fn get_head_style(val_style: &serde_json::Value, font_cache: &HashMap<String, FontFamily<Font>>) -> style::Style {
@@ -223,6 +231,25 @@ fn get_head_style(val_style: &serde_json::Value, font_cache: &HashMap<String, Fo
     }    
     return mstyle;
 }
+
+fn get_frame<U: rckive_genpdf::Element + 'static>(
+                        element: U, 
+                        frame_thickness: f32, frame_color: style::Color, frame_dash: i64, 
+                        frame_gap: i64, frame_dash2: i64, frame_gap2: i64, ftop: bool, fright: bool, 
+                        fbottom: bool, fleft: bool, has_background: bool, background_color: style::Color) -> elements::FramedElement<U> {
+    
+        return elements::FramedElement::with_line_style_trbl_and_background(element,
+                                                                            style::LineStyle::new()
+                                                                            .with_thickness(frame_thickness)
+                                                                            .with_color(frame_color)
+                                                                            .with_dash(frame_dash).with_dash2(frame_dash2)
+                                                                            .with_gap(frame_gap).with_gap2(frame_gap2),
+                                                                                ftop, fright, fbottom, fleft,   
+                                                                            has_background, style::BackgroundStyle::new().with_color(background_color));
+    
+}
+
+
 /// GenpdfJson
 impl GenpdfJson {
     fn new(json_config: &serde_json::Value, db_path: impl AsRef<path::Path>) -> Self {        
@@ -650,6 +677,7 @@ impl GenpdfJson {
         return (frame_dash, frame_gap, frame_dash2, frame_gap2);
         
     }
+    
     fn get_sides(&self, frame: &serde_json::Map<std::string::String, serde_json::Value>) -> (bool, bool, bool, bool) {
         let (mut ftop, mut fright, mut fbottom, mut fleft) = (true, true, true, true);
         if let Some(top) = frame.get("top").and_then(|v| v.as_bool()){
@@ -667,6 +695,7 @@ impl GenpdfJson {
         return (ftop, fright, fbottom, fleft);
         
     }
+    
     fn get_style(&self, val_style: &serde_json::Value) -> style::Style {
         let mut mstyle = style::Style::new();
                                       
@@ -701,6 +730,30 @@ impl GenpdfJson {
         return mstyle;
     }
     
+    ///function to simplify the matching of root layouts 
+    fn match_root_layout<T: RootLayout, U: rckive_genpdf::Element + 'static>(&mut self,
+                                                                             root_layout: &mut T,
+                                                                             element:U) -> Result<(), Box<dyn std::error::Error>>{
+        match root_layout.type_name(){
+            "NoneLayout" =>{
+                self.doc.push(element);
+            }
+            "StaticList" =>{
+                root_layout.push_static(element);
+            }
+            "TableLayout" =>{
+                //
+            }
+            "VecLayout" =>{
+                root_layout.push_cell(Box::new(element));
+            }
+            _ => {
+                root_layout.push(element);
+            }
+        }
+        Ok(())
+    }
+    
     fn match_text_paragraph<T: RootLayout, U: rckive_genpdf::Element + 'static>(&mut self,  element:U, root_layout: &mut T, 
                                                                                 has_frame: bool, frame_thickness: f32, 
                                                                                 frame_color: style::Color, frame_dash: i64, 
@@ -708,135 +761,25 @@ impl GenpdfJson {
                                                                                 ftop: bool, fright: bool, fbottom: bool, fleft: bool,
                                                                                 has_background: bool, background_color: style::Color,
                                                                                 bullet: &str) -> Result<(), Box<dyn std::error::Error>> {
-        match root_layout.type_name(){
-            "NoneLayout" =>{
-                if bullet != "" {
-                    if has_frame{
-                        let nlayout = elements::FramedElement::with_line_style_trbl_and_background(element,
-                                                                                style::LineStyle::new()
-                                                                                .with_thickness(frame_thickness)
-                                                                                .with_color(frame_color)
-                                                                                .with_dash(frame_dash).with_dash2(frame_dash2)
-                                                                                .with_gap(frame_gap).with_gap2(frame_gap2),
-                                                                                    ftop, fright, fbottom, fleft,   
-                                                                                has_background, style::BackgroundStyle::new().with_color(background_color));
-                        self.doc.push(BulletPoint::new(nlayout).with_bullet(bullet));                                     
-                    }else{
-                        self.doc.push(BulletPoint::new(element).with_bullet(bullet)); 
-                    }                                                                        
-                }else{
-                    if has_frame{
-                        let nlayout = elements::FramedElement::with_line_style_trbl_and_background(element,
-                                                                                style::LineStyle::new()
-                                                                                .with_thickness(frame_thickness)
-                                                                                .with_color(frame_color)
-                                                                                .with_dash(frame_dash).with_dash2(frame_dash2)
-                                                                                .with_gap(frame_gap).with_gap2(frame_gap2),
-                                                                                    ftop, fright, fbottom, fleft,   
-                                                                                has_background, style::BackgroundStyle::new().with_color(background_color));
-                        self.doc.push(nlayout);                                     
-                    }else{
-                        self.doc.push(element);
-                    }                                    
-                } 
-            }
-            "StaticList" =>{
-                if bullet != "" {
-                    if has_frame{
-                        let nlayout = elements::FramedElement::with_line_style_trbl_and_background(element,
-                                                                                style::LineStyle::new()
-                                                                                .with_thickness(frame_thickness)
-                                                                                .with_color(frame_color)
-                                                                                .with_dash(frame_dash).with_dash2(frame_dash2)
-                                                                                .with_gap(frame_gap).with_gap2(frame_gap2),
-                                                                                    ftop, fright, fbottom, fleft,   
-                                                                                has_background, style::BackgroundStyle::new().with_color(background_color));
-                        root_layout.push_static(BulletPoint::new(nlayout).with_bullet(bullet));                                     
-                    }else{
-                        root_layout.push_static(BulletPoint::new(element).with_bullet(bullet));
-                    }                                      
-                }else{
-                    if has_frame{
-                        let nlayout = elements::FramedElement::with_line_style_trbl_and_background(element,
-                                                                                style::LineStyle::new()
-                                                                                .with_thickness(frame_thickness)
-                                                                                .with_color(frame_color)
-                                                                                .with_dash(frame_dash).with_dash2(frame_dash2)
-                                                                                .with_gap(frame_gap).with_gap2(frame_gap2),
-                                                                                    ftop, fright, fbottom, fleft,   
-                                                                                has_background, style::BackgroundStyle::new().with_color(background_color));
-                        root_layout.push_static(nlayout);                                      
-                    }else{
-                        root_layout.push_static(element);
-                    }                                      
-                }                                
-            }
-            "TableLayout" =>{
-                //
-            }  
-            "VecLayout" =>{
-                if bullet != "" {                                    
-                    if has_frame{
-                        let nlayout = elements::FramedElement::with_line_style_trbl_and_background(element,
-                                                                                style::LineStyle::new()
-                                                                                .with_thickness(frame_thickness)
-                                                                                .with_color(frame_color)
-                                                                                .with_dash(frame_dash).with_dash2(frame_dash2)
-                                                                                .with_gap(frame_gap).with_gap2(frame_gap2),
-                                                                                    ftop, fright, fbottom, fleft,   
-                                                                                has_background, style::BackgroundStyle::new().with_color(background_color));
-                        root_layout.push_cell(Box::new(BulletPoint::new(nlayout).with_bullet(bullet)));                                      
-                    }else{
-                        root_layout.push_cell(Box::new(BulletPoint::new(element).with_bullet(bullet)));
-                    }
-                }else{
-                    if has_frame{
-                        let nlayout = elements::FramedElement::with_line_style_trbl_and_background(element,
-                                                                                style::LineStyle::new()
-                                                                                .with_thickness(frame_thickness)
-                                                                                .with_color(frame_color)
-                                                                                .with_dash(frame_dash).with_dash2(frame_dash2)
-                                                                                .with_gap(frame_gap).with_gap2(frame_gap2),
-                                                                                    ftop, fright, fbottom, fleft,   
-                                                                                has_background, style::BackgroundStyle::new().with_color(background_color));
-                        root_layout.push_cell(Box::new(nlayout));                                        
-                    }else{
-                        root_layout.push_cell(Box::new(element));
-                    }                                      
-                }                                
-            }
-            _ => {
-                if bullet != "" {
-                    if has_frame{
-                        let nlayout = elements::FramedElement::with_line_style_trbl_and_background(element,
-                                                                                style::LineStyle::new()
-                                                                                .with_thickness(frame_thickness)
-                                                                                .with_color(frame_color)
-                                                                                .with_dash(frame_dash).with_dash2(frame_dash2)
-                                                                                .with_gap(frame_gap).with_gap2(frame_gap2),
-                                                                                    ftop, fright, fbottom, fleft,   
-                                                                                has_background, style::BackgroundStyle::new().with_color(background_color));
-                        root_layout.push(BulletPoint::new(nlayout).with_bullet(bullet));                                              
-                    }else{
-                        root_layout.push(BulletPoint::new(element).with_bullet(bullet));       
-                    }                                                                       
-                }else{
-                    if has_frame{
-                        let nlayout = elements::FramedElement::with_line_style_trbl_and_background(element,
-                                                                                style::LineStyle::new()
-                                                                                .with_thickness(frame_thickness)
-                                                                                .with_color(frame_color)
-                                                                                .with_dash(frame_dash).with_dash2(frame_dash2)
-                                                                                .with_gap(frame_gap).with_gap2(frame_gap2),
-                                                                                    ftop, fright, fbottom, fleft,  
-                                                                                has_background, style::BackgroundStyle::new().with_color(background_color));
-                        root_layout.push(nlayout);                                        
-                    }else{
-                        root_layout.push(element);
-                    }                                    
-                }
-            }
-        }                        
+                                                                                    
+        
+        if bullet != "" {
+            if has_frame{                        
+                let nlayout = get_frame(element, frame_thickness, frame_color, frame_dash, frame_gap, frame_dash2, frame_gap2,
+                                        ftop, fright, fbottom, fleft, has_background, background_color);                                        
+                let _ = self.match_root_layout(root_layout, BulletPoint::new(nlayout).with_bullet(bullet))?;
+            }else{
+                let _ = self.match_root_layout(root_layout, BulletPoint::new(element).with_bullet(bullet))?;
+            }                                                                        
+        }else{
+            if has_frame{
+                let nlayout = get_frame(element, frame_thickness, frame_color, frame_dash, frame_gap, frame_dash2, frame_gap2,
+                                        ftop, fright, fbottom, fleft, has_background, background_color);
+                let _ = self.match_root_layout(root_layout, nlayout)?;                                                  
+            }else{
+                let _ = self.match_root_layout(root_layout, element)?;
+            }                                    
+        }        
         Ok(())
     }   
     
@@ -890,7 +833,7 @@ impl GenpdfJson {
                                     if let Some(background) = frame.get("background").and_then(|v| v.as_bool()){
                                         has_background = background;
                                         if let Some(b_color) = frame.get("background_color"){
-                                            background_color = get_color(b_color);
+                                            background_color = get_background_color(b_color);
                                         }  
                                     }  
                                 }
@@ -900,73 +843,13 @@ impl GenpdfJson {
                                     nlayout,
                                     Margins::trbl(paddings[0], paddings[1], paddings[2], paddings[3]),
                                 ); 
-                                match root_layout.type_name(){
-                                    "NoneLayout" =>{ 
-                                        if has_frame{                                            
-                                            let nlayout = elements::FramedElement::with_line_style_trbl_and_background(nlayout,
-                                                                                                   style::LineStyle::new()
-                                                                                                   .with_thickness(frame_thickness)
-                                                                                                   .with_color(frame_color)
-                                                                                                   .with_dash(frame_dash).with_dash2(frame_dash2)
-                                                                                                   .with_gap(frame_gap).with_gap2(frame_gap2),
-                                                                                                        ftop, fright, fbottom, fleft,  
-                                                                                                    has_background, style::BackgroundStyle::new().with_color(background_color));                                            
-                                            self.doc.push(nlayout);
-                                        }else{
-                                            self.doc.push(nlayout);
-                                        }
-                                    }
-                                    "StaticList" =>{
-                                        if has_frame{
-                                            let nlayout = elements::FramedElement::with_line_style_trbl_and_background(nlayout,
-                                                                                                   style::LineStyle::new()
-                                                                                                   .with_thickness(frame_thickness)
-                                                                                                   .with_color(frame_color)
-                                                                                                   .with_dash(frame_dash).with_dash2(frame_dash2)
-                                                                                                   .with_gap(frame_gap).with_gap2(frame_gap2),
-                                                                                                        ftop, fright, fbottom, fleft,  
-                                                                                                    has_background, style::BackgroundStyle::new().with_color(background_color)); 
-                                            root_layout.push_static(nlayout);
-                                        }else{
-                                            root_layout.push_static(nlayout);
-                                        }
-                                        
-                                    }
-                                    "TableLayout" =>{
-                                        // not used
-                                    }   
-                                    "VecLayout" =>{
-                                        if has_frame{
-                                            let nlayout = elements::FramedElement::with_line_style_trbl_and_background(nlayout,
-                                                                                                   style::LineStyle::new()
-                                                                                                   .with_thickness(frame_thickness)
-                                                                                                   .with_color(frame_color)
-                                                                                                   .with_dash(frame_dash).with_dash2(frame_dash2)
-                                                                                                   .with_gap(frame_gap).with_gap2(frame_gap2),
-                                                                                                        ftop, fright, fbottom, fleft,  
-                                                                                                    has_background, style::BackgroundStyle::new().with_color(background_color)); 
-                                            root_layout.push_cell(Box::new(nlayout));
-                                        }else{
-                                            root_layout.push_cell(Box::new(nlayout));
-                                        }                                        
-                                    }
-                                    _ => {
-                                        if has_frame{
-                                            let nlayout = elements::FramedElement::with_line_style_trbl_and_background(nlayout,
-                                                                                                   style::LineStyle::new()
-                                                                                                   .with_thickness(frame_thickness)
-                                                                                                   .with_color(frame_color)
-                                                                                                   .with_dash(frame_dash).with_dash2(frame_dash2)
-                                                                                                   .with_gap(frame_gap).with_gap2(frame_gap2),
-                                                                                                        ftop, fright, fbottom, fleft, 
-                                                                                                    has_background, style::BackgroundStyle::new().with_color(background_color)); 
-                                            root_layout.push(nlayout);
-                                        }else{
-                                            root_layout.push(nlayout);
-                                        }
-                                        
-                                    }
-                                }                                                                                              
+                                if has_frame{
+                                    let nlayout = get_frame(nlayout, frame_thickness, frame_color, frame_dash, frame_gap, frame_dash2, frame_gap2,
+                                        ftop, fright, fbottom, fleft, has_background, background_color); 
+                                    let _ = self.match_root_layout(root_layout, nlayout)?;                                     
+                                }else{
+                                    let _ = self.match_root_layout(root_layout, nlayout)?;
+                                }                                                                                      
                             }else if orientation == "horizontal"{
                                 if let Some(column_weights) = item_obj.get("column_weights").and_then(|v| v.as_array()) {
                                     if column_weights.len() > 0 {                                        
@@ -1021,23 +904,7 @@ impl GenpdfJson {
                                             nlayout,
                                             Margins::trbl(paddings[0], paddings[1], paddings[2], paddings[3]),
                                         );
-                                        match root_layout.type_name(){
-                                            "NoneLayout" =>{    
-                                                self.doc.push(nlayout);
-                                            }
-                                            "StaticList" =>{
-                                                root_layout.push_static(nlayout);
-                                            }
-                                            "TableLayout" =>{
-                                                // not used
-                                            }   
-                                            "VecLayout" =>{
-                                                root_layout.push_cell(Box::new(nlayout));
-                                            }
-                                            _ => {                                                
-                                                root_layout.push(nlayout);
-                                            }
-                                        }                                                                                
+                                        let _ = self.match_root_layout(root_layout, nlayout)?;                                       
                                     }                                    
                                 }                                                                                                                                               
                             }
@@ -1135,23 +1002,7 @@ impl GenpdfJson {
                                     nlayout,
                                     Margins::trbl(paddings[0], paddings[1], paddings[2], paddings[3]),
                                 );
-                                match root_layout.type_name(){
-                                    "NoneLayout" =>{    
-                                        self.doc.push(nlayout);
-                                    }
-                                    "StaticList" =>{
-                                        root_layout.push_static(nlayout);
-                                    }
-                                    "TableLayout" =>{
-                                        // not used
-                                    }   
-                                    "VecLayout" =>{
-                                        root_layout.push_cell(Box::new(nlayout));
-                                    }
-                                    _ => {                                                
-                                        root_layout.push(nlayout);
-                                    }
-                                } 
+                                let _ = self.match_root_layout(root_layout, nlayout)?;                                
                             }
                         }                                            
                     }
@@ -1188,7 +1039,7 @@ impl GenpdfJson {
                             if let Some(background) = frame.get("background").and_then(|v| v.as_bool()){
                                 has_background = background;
                                 if let Some(b_color) = frame.get("background_color"){
-                                    background_color = get_color(b_color);
+                                    background_color = get_background_color(b_color);
                                 }  
                             }
                             
@@ -1203,71 +1054,13 @@ impl GenpdfJson {
                             nlayout,
                             Margins::trbl(paddings[0], paddings[1], paddings[2], paddings[3]),
                         );
-                        match root_layout.type_name(){
-                            "NoneLayout" =>{         
-                                if has_frame{
-                                    let nlayout = elements::FramedElement::with_line_style_trbl_and_background(nlayout,
-                                                                                            style::LineStyle::new()
-                                                                                            .with_thickness(frame_thickness)
-                                                                                            .with_color(frame_color)
-                                                                                            .with_dash(frame_dash).with_dash2(frame_dash2)
-                                                                                            .with_gap(frame_gap).with_gap2(frame_gap2),
-                                                                                                ftop, fright, fbottom, fleft, 
-                                                                                            has_background, style::BackgroundStyle::new().with_color(background_color)); 
-                                    self.doc.push(nlayout);
-                                }else{
-                                    self.doc.push(nlayout);
-                                }                                 
-                            }
-                            "StaticList" =>{
-                                if has_frame{
-                                    let nlayout = elements::FramedElement::with_line_style_trbl_and_background(nlayout,
-                                                                                            style::LineStyle::new()
-                                                                                            .with_thickness(frame_thickness)
-                                                                                            .with_color(frame_color)
-                                                                                            .with_dash(frame_dash).with_dash2(frame_dash2)
-                                                                                            .with_gap(frame_gap).with_gap2(frame_gap2),
-                                                                                                ftop, fright, fbottom, fleft, 
-                                                                                            has_background, style::BackgroundStyle::new().with_color(background_color)); 
-                                    root_layout.push_static(nlayout);
-                                }else{
-                                    root_layout.push_static(nlayout);
-                                }                                 
-                            }
-                            "TableLayout" =>{
-                                //
-                            }  
-                            "VecLayout" =>{
-                                if has_frame{
-                                    let nlayout = elements::FramedElement::with_line_style_trbl_and_background(nlayout,
-                                                                                            style::LineStyle::new()
-                                                                                            .with_thickness(frame_thickness)
-                                                                                            .with_color(frame_color)
-                                                                                            .with_dash(frame_dash).with_dash2(frame_dash2)
-                                                                                            .with_gap(frame_gap).with_gap2(frame_gap2),
-                                                                                                ftop, fright, fbottom, fleft, 
-                                                                                            has_background, style::BackgroundStyle::new().with_color(background_color)); 
-                                    root_layout.push_cell(Box::new(nlayout));
-                                }else{
-                                    root_layout.push_cell(Box::new(nlayout));
-                                }                                 
-                            }
-                            _ => {
-                                if has_frame{
-                                    let nlayout = elements::FramedElement::with_line_style_trbl_and_background(nlayout,
-                                                                                            style::LineStyle::new()
-                                                                                            .with_thickness(frame_thickness)
-                                                                                            .with_color(frame_color)
-                                                                                            .with_dash(frame_dash).with_dash2(frame_dash2)
-                                                                                            .with_gap(frame_gap).with_gap2(frame_gap2),
-                                                                                                ftop, fright, fbottom, fleft, 
-                                                                                            has_background, style::BackgroundStyle::new().with_color(background_color)); 
-                                    root_layout.push(nlayout);
-                                }else{
-                                    root_layout.push(nlayout);
-                                }                                
-                            }
-                        }
+                        if has_frame{
+                            let nlayout = get_frame(nlayout, frame_thickness, frame_color, frame_dash, frame_gap, frame_dash2, frame_gap2,
+                                        ftop, fright, fbottom, fleft, has_background, background_color);                                  
+                            let _ = self.match_root_layout(root_layout, nlayout)?; 
+                        }else{
+                            let _ = self.match_root_layout(root_layout, nlayout)?; 
+                        }                                                
                     }
                     
                     "unordered_list" => {
@@ -1302,7 +1095,7 @@ impl GenpdfJson {
                             if let Some(background) = frame.get("background").and_then(|v| v.as_bool()){
                                 has_background = background;
                                 if let Some(b_color) = frame.get("background_color"){
-                                    background_color = get_color(b_color);
+                                    background_color = get_background_color(b_color);
                                 }  
                             }
                         }                        
@@ -1317,71 +1110,13 @@ impl GenpdfJson {
                             nlayout,
                             Margins::trbl(paddings[0], paddings[1], paddings[2], paddings[3]),
                         );
-                        match root_layout.type_name(){
-                            "NoneLayout" =>{
-                                if has_frame{
-                                    let nlayout = elements::FramedElement::with_line_style_trbl_and_background(nlayout,
-                                                                                            style::LineStyle::new()
-                                                                                            .with_thickness(frame_thickness)
-                                                                                            .with_color(frame_color)
-                                                                                            .with_dash(frame_dash).with_dash2(frame_dash2)
-                                                                                            .with_gap(frame_gap).with_gap2(frame_gap2),
-                                                                                                ftop, fright, fbottom, fleft, 
-                                                                                            has_background, style::BackgroundStyle::new().with_color(background_color)); 
-                                    self.doc.push(nlayout);
-                                }else{
-                                    self.doc.push(nlayout);
-                                }
-                            }
-                            "StaticList" =>{
-                                if has_frame{
-                                    let nlayout = elements::FramedElement::with_line_style_trbl_and_background(nlayout,
-                                                                                            style::LineStyle::new()
-                                                                                            .with_thickness(frame_thickness)
-                                                                                            .with_color(frame_color)
-                                                                                            .with_dash(frame_dash).with_dash2(frame_dash2)
-                                                                                            .with_gap(frame_gap).with_gap2(frame_gap2),
-                                                                                                ftop, fright, fbottom, fleft, 
-                                                                                            has_background, style::BackgroundStyle::new().with_color(background_color)); 
-                                    root_layout.push_static(nlayout);
-                                }else{
-                                    root_layout.push_static(nlayout);
-                                }
-                            }
-                            "TableLayout" =>{
-                                //
-                            }  
-                            "VecLayout" =>{
-                                if has_frame{
-                                    let nlayout = elements::FramedElement::with_line_style_trbl_and_background(nlayout,
-                                                                                            style::LineStyle::new()
-                                                                                            .with_thickness(frame_thickness)
-                                                                                            .with_color(frame_color)
-                                                                                            .with_dash(frame_dash).with_dash2(frame_dash2)
-                                                                                            .with_gap(frame_gap).with_gap2(frame_gap2),
-                                                                                                ftop, fright, fbottom, fleft, 
-                                                                                            has_background, style::BackgroundStyle::new().with_color(background_color)); 
-                                    root_layout.push_cell(Box::new(nlayout));
-                                }else{
-                                    root_layout.push_cell(Box::new(nlayout));
-                                }
-                            }
-                            _ => {
-                                if has_frame{
-                                    let nlayout = elements::FramedElement::with_line_style_trbl_and_background(nlayout,
-                                                                                            style::LineStyle::new()
-                                                                                            .with_thickness(frame_thickness)
-                                                                                            .with_color(frame_color)
-                                                                                            .with_dash(frame_dash).with_dash2(frame_dash2)
-                                                                                            .with_gap(frame_gap).with_gap2(frame_gap2),
-                                                                                                ftop, fright, fbottom, fleft, 
-                                                                                            has_background, style::BackgroundStyle::new().with_color(background_color)); 
-                                    root_layout.push(nlayout);
-                                }else{
-                                    root_layout.push(nlayout);
-                                }
-                            }
-                        }
+                        if has_frame{
+                            let nlayout = get_frame(nlayout, frame_thickness, frame_color, frame_dash, frame_gap, frame_dash2, frame_gap2,
+                                        ftop, fright, fbottom, fleft, has_background, background_color);                                    
+                            let _ = self.match_root_layout(root_layout, nlayout)?;
+                        }else{
+                            let _ = self.match_root_layout(root_layout, nlayout)?;
+                        }                                               
                     }
                     
                     "break" => {
@@ -1389,23 +1124,7 @@ impl GenpdfJson {
                             let element = Break::new(value);
                             //allow line break in negative
                             // if value > 0.0 {
-                                match root_layout.type_name(){
-                                    "NoneLayout" =>{                                                
-                                        self.doc.push(element);
-                                    }
-                                    "StaticList" =>{
-                                        root_layout.push_static(element);
-                                    }
-                                    "TableLayout" =>{
-                                        //
-                                    }  
-                                    "VecLayout" =>{
-                                        root_layout.push_cell(Box::new(element));
-                                    }
-                                    _ => {
-                                        root_layout.push(element);
-                                    }
-                                }
+                                let _ = self.match_root_layout(root_layout, element)?;                                
                             // }
                         }
                     }
@@ -1479,7 +1198,7 @@ impl GenpdfJson {
                                 if let Some(background) = frame.get("background").and_then(|v| v.as_bool()){
                                     has_background = background;
                                     if let Some(b_color) = frame.get("background_color"){
-                                        background_color = get_color(b_color);
+                                        background_color = get_background_color(b_color);
                                     }  
                                 }
                             }
@@ -1488,71 +1207,13 @@ impl GenpdfJson {
                                 image,
                                 Margins::trbl(paddings[0], paddings[1], paddings[2], paddings[3]),
                             );
-                            match root_layout.type_name(){
-                                    "NoneLayout" =>{       
-                                        if has_frame{
-                                            let nlayout = elements::FramedElement::with_line_style_trbl_and_background(image,
-                                                                                            style::LineStyle::new()
-                                                                                            .with_thickness(frame_thickness)
-                                                                                            .with_color(frame_color)
-                                                                                            .with_dash(frame_dash).with_dash2(frame_dash2)
-                                                                                            .with_gap(frame_gap).with_gap2(frame_gap2),
-                                                                                                ftop, fright, fbottom, fleft, 
-                                                                                                has_background, style::BackgroundStyle::new().with_color(background_color)); 
-                                            self.doc.push(nlayout);
-                                        }else{
-                                            self.doc.push(image);
-                                        }                                        
-                                    }
-                                    "StaticList" =>{
-                                        if has_frame{
-                                            let nlayout = elements::FramedElement::with_line_style_trbl_and_background(image,
-                                                                                            style::LineStyle::new()
-                                                                                            .with_thickness(frame_thickness)
-                                                                                            .with_color(frame_color)
-                                                                                            .with_dash(frame_dash).with_dash2(frame_dash2)
-                                                                                            .with_gap(frame_gap).with_gap2(frame_gap2),
-                                                                                                ftop, fright, fbottom, fleft, 
-                                                                                                has_background, style::BackgroundStyle::new().with_color(background_color)); 
-                                            root_layout.push_static(nlayout);
-                                        }else{
-                                            root_layout.push_static(image);
-                                        }                                         
-                                    }
-                                    "TableLayout" =>{
-                                        //
-                                    }  
-                                    "VecLayout" =>{
-                                        if has_frame{
-                                            let nlayout = elements::FramedElement::with_line_style_trbl_and_background(image,
-                                                                                            style::LineStyle::new()
-                                                                                            .with_thickness(frame_thickness)
-                                                                                            .with_color(frame_color)
-                                                                                            .with_dash(frame_dash).with_dash2(frame_dash2)
-                                                                                            .with_gap(frame_gap).with_gap2(frame_gap2),
-                                                                                                ftop, fright, fbottom, fleft, 
-                                                                                                has_background, style::BackgroundStyle::new().with_color(background_color)); 
-                                            root_layout.push_cell(Box::new(nlayout));
-                                        }else{
-                                            root_layout.push_cell(Box::new(image));
-                                        }                                        
-                                    }
-                                    _ => {
-                                        if has_frame{
-                                            let nlayout = elements::FramedElement::with_line_style_trbl_and_background(image,
-                                                                                            style::LineStyle::new()
-                                                                                            .with_thickness(frame_thickness)
-                                                                                            .with_color(frame_color)
-                                                                                            .with_dash(frame_dash).with_dash2(frame_dash2)
-                                                                                            .with_gap(frame_gap).with_gap2(frame_gap2),
-                                                                                                ftop, fright, fbottom, fleft, 
-                                                                                            has_background, style::BackgroundStyle::new().with_color(background_color)); 
-                                            root_layout.push(nlayout);
-                                        }else{
-                                            root_layout.push(image);
-                                        }                                        
-                                    }
-                            }                                                        
+                            if has_frame{
+                                let nlayout = get_frame(image, frame_thickness, frame_color, frame_dash, frame_gap, frame_dash2, frame_gap2,
+                                    ftop, fright, fbottom, fleft, has_background, background_color);                                           
+                                let _ = self.match_root_layout(root_layout, nlayout)?;
+                            }else{
+                                let _ = self.match_root_layout(root_layout, image)?;
+                            }                                                                                                        
                         }
                     }
                     "paragraph" => {                                          
@@ -1604,7 +1265,7 @@ impl GenpdfJson {
                             if let Some(background) = frame.get("background").and_then(|v| v.as_bool()){
                                 has_background = background;
                                 if let Some(b_color) = frame.get("background_color"){
-                                    background_color = get_color(b_color);
+                                    background_color = get_background_color(b_color);
                                 }  
                             }
                         }                        
@@ -1661,7 +1322,7 @@ impl GenpdfJson {
                             if let Some(background) = frame.get("background").and_then(|v| v.as_bool()){
                                 has_background = background;
                                 if let Some(b_color) = frame.get("background_color"){
-                                    background_color = get_color(b_color);
+                                    background_color = get_background_color(b_color);
                                 }  
                             }
                         }                      
@@ -1681,6 +1342,7 @@ impl GenpdfJson {
          Ok(())
     }    
 }
+
 /// render file pdf from file json
 pub fn render_json_file(json_path: impl AsRef<path::Path>, path: impl AsRef<path::Path>) -> Result<(), Box<dyn std::error::Error>> {
         let mut config_default = json!({        
@@ -1705,6 +1367,7 @@ pub fn render_json_file(json_path: impl AsRef<path::Path>, path: impl AsRef<path
         println!("generated successfully");
         Ok(())
     }
+    
 /// render pdf in memory and return string base64 from file json
 pub fn render_json_base64(json_string: &String) -> Result<String, Box<dyn std::error::Error>> {
         let mut config_default = json!({        
@@ -1725,6 +1388,7 @@ pub fn render_json_base64(json_string: &String) -> Result<String, Box<dyn std::e
         let result = genpdf.render_json_base64(&json_value)?;        
         Ok(result)
     }
+    
 /// render file pdf from sqlite .db
 pub fn render_file_from_sqlite(db_path: impl AsRef<path::Path>, path: impl AsRef<path::Path>) -> Result<(), Box<dyn std::error::Error>> {
         let mut config_default = json!({        
@@ -1753,6 +1417,7 @@ pub fn render_file_from_sqlite(db_path: impl AsRef<path::Path>, path: impl AsRef
         println!("generated successfully");
         Ok(())
 }
+
 /// render pdf in memory and return string base64 from sqlite .db
 pub fn render_base64_from_sqlite(db_path: impl AsRef<path::Path>) -> Result<String, Box<dyn std::error::Error>> {
     let mut config_default = json!({        
@@ -1776,6 +1441,7 @@ pub fn render_base64_from_sqlite(db_path: impl AsRef<path::Path>) -> Result<Stri
     genpdf.extra_push(&config_default)?;
     let result = genpdf.render_base64_from_sqlite(&db_path)?;        
     Ok(result)
-}    
+}
+
 /// Read the version from build
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
