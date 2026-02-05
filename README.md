@@ -150,6 +150,9 @@ config:
     "head_page": paragraph, or [paragraph, paragraph, paragraph] maximum 3 paragraphs
     "footer_page": [paragraph, paragraph, paragraph] maximum 3 paragraphs
     "head_page_count": paragraph,
+    "header_frame": line_style,
+    "footer_frame": line_style,
+    "page_frame": line_style,
     "deafault_font_size": int,
     "skip_warning_overflowed": bool -> Skip the page size exceeded warning when the paragraph exceeds the layout
 }
