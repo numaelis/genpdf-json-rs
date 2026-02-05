@@ -1,5 +1,5 @@
 use rckive_genpdf::{
-    elements, fonts, style, PaperSize, Margins, Alignment, Element, elements::{Paragraph, IntoBoxedElement, Text, PaddedElement, TableLayout, FrameCellDecorator, LinearLayout, OrderedList, UnorderedList, BulletPoint, Break, PageBreak},
+    elements, fonts, style, PaperSize, Margins, Alignment, Element, Position, elements::{Paragraph, IntoBoxedElement, Text, PaddedElement, TableLayout, FrameCellDecorator, LinearLayout, OrderedList, UnorderedList, BulletPoint, Break, PageBreak},
 };
 
 use rckive_genpdf::fonts::{FontFamily, Font, FontData};
@@ -199,6 +199,23 @@ fn get_background_color(val_color: &serde_json::Value) -> style::Color {
 fn get_color(val_color: &serde_json::Value) -> style::Color {
     return _get_color(val_color, style::Color::Rgb(0,0,0));
 }
+
+fn get_dashes(frame: &serde_json::Map<std::string::String, serde_json::Value>) -> (i64, i64, i64, i64) {
+        let (mut frame_dash, mut frame_gap, mut frame_dash2, mut frame_gap2) = (0, 0, 0, 0);        
+        if let Some(dash) = frame.get("dash").and_then(|v| Some(v.as_f64().unwrap_or(0.0) as i64)){
+            frame_dash = dash;
+        }
+        if let Some(gap) = frame.get("gap").and_then(|v| Some(v.as_f64().unwrap_or(0.0) as i64)){
+            frame_gap = gap;
+        }
+        if let Some(dash2) = frame.get("dash2").and_then(|v| Some(v.as_f64().unwrap_or(0.0) as i64)){
+            frame_dash2 = dash2;
+        }
+        if let Some(gap2) = frame.get("gap2").and_then(|v| Some(v.as_f64().unwrap_or(0.0) as i64)){
+            frame_gap2 = gap2;
+        }
+        return (frame_dash, frame_gap, frame_dash2, frame_gap2);        
+    }
      
 fn get_head_style(val_style: &serde_json::Value, font_cache: &HashMap<String, FontFamily<Font>>) -> style::Style {
     let mut mstyle = style::Style::new();
@@ -413,7 +430,7 @@ impl GenpdfJson {
                     let head_paragraph_2 = head_paragraph_2.clone();
                     layout.push(head_paragraph_2);
                 }
-                layout.push(elements::Break::new(1.));
+                layout.push(elements::Break::new(0.6));
             }
             if page > 1 && page_count_text!= "".to_string()  {
                 layout.push(
@@ -525,6 +542,8 @@ impl GenpdfJson {
                         
             let off_bottom_margin = hei0.clone() - line_off;
             decorator.set_margins(Margins::trbl(_top_margin, _right_margin, _bottom_margin + off_bottom_margin, _left_margin));
+            //save rec footer
+            doc.set_rec_footer(Position::new(x,y + line_off), Position::new(width_area, off_bottom_margin));
         }
         
         decorator.set_footer( move |page|{     
@@ -532,15 +551,17 @@ impl GenpdfJson {
             let mut layout = elements::LinearLayout::vertical().with_orphan(true);
             
             layout.set_orphan_position(x, y);
+            
+            let mut layout_in = elements::LinearLayout::vertical();//.padded(1);
             if count_footer_paragraph > 0 && width_area > 10.0{  
-                let footer_paragraph_0 = footer_paragraph_0.clone();
+                let footer_paragraph_0 = footer_paragraph_0.clone().padded(rckive_genpdf::Margins::vh(0.0, 0.1));
                 layout.push(footer_paragraph_0);
                 if count_footer_paragraph > 1 {
-                    let footer_paragraph_1 = footer_paragraph_1.clone();
+                    let footer_paragraph_1 = footer_paragraph_1.clone().padded(rckive_genpdf::Margins::vh(0.0, 0.1));
                     layout.push(footer_paragraph_1);
                 }
                 if count_footer_paragraph > 2 {
-                    let footer_paragraph_2 = footer_paragraph_2.clone();
+                    let footer_paragraph_2 = footer_paragraph_2.clone().padded(rckive_genpdf::Margins::vh(0.0, 0.1));
                     layout.push(footer_paragraph_2);
                 }
                 layout.push(elements::Break::new(1.));
@@ -553,10 +574,80 @@ impl GenpdfJson {
             //     layout.push(elements::Break::new(1.));
             // }
             layout.styled(style::Style::new())
+            // layout.push(layout_in)
         });
         
         doc.set_page_decorator(decorator);
-                   
+        
+        // add page frame
+        if let Some(page_frame) = json_config.get("page_frame").and_then(|v| v.as_object()) {
+            let mut frame_thickness = 0.1;
+            let mut frame_color = style::Color::Rgb(0,0,0);
+            let (mut frame_dash, mut frame_gap, mut frame_dash2, mut frame_gap2) = (0, 0, 0, 0);
+            
+            if let Some(thickness)= page_frame.get("thickness").and_then(|v| Some(v.as_f64().unwrap_or(0.0) as f32)){
+                frame_thickness = thickness;
+            }
+            
+            if let Some(color) = page_frame.get("color"){
+                frame_color = get_color(color);
+            }
+            
+            (frame_dash, frame_gap, frame_dash2, frame_gap2) = get_dashes(page_frame);
+            
+            let line = style::LineStyle::new().with_thickness(frame_thickness)
+                                                .with_color(frame_color)
+                                                .with_dash(frame_dash).with_dash2(frame_dash2)
+                                                .with_gap(frame_gap).with_gap2(frame_gap2);
+            doc.set_page_frame_line_style(line);
+        }    
+        
+        // add header frame
+        if let Some(header_frame) = json_config.get("header_frame").and_then(|v| v.as_object()) {
+            let mut frame_thickness = 0.1;
+            let mut frame_color = style::Color::Rgb(0,0,0);
+            let (mut frame_dash, mut frame_gap, mut frame_dash2, mut frame_gap2) = (0, 0, 0, 0);
+            
+            if let Some(thickness)= header_frame.get("thickness").and_then(|v| Some(v.as_f64().unwrap_or(0.0) as f32)){
+                frame_thickness = thickness;
+            }
+            
+            if let Some(color) = header_frame.get("color"){
+                frame_color = get_color(color);
+            }
+            
+            (frame_dash, frame_gap, frame_dash2, frame_gap2) = get_dashes(header_frame);
+            
+            let line = style::LineStyle::new().with_thickness(frame_thickness)
+                                                .with_color(frame_color)
+                                                .with_dash(frame_dash).with_dash2(frame_dash2)
+                                                .with_gap(frame_gap).with_gap2(frame_gap2);
+            doc.set_header_frame_line_style(line);
+        }  
+        
+        // add header frame
+        if let Some(footer_frame) = json_config.get("footer_frame").and_then(|v| v.as_object()) {
+            let mut frame_thickness = 0.1;
+            let mut frame_color = style::Color::Rgb(0,0,0);
+            let (mut frame_dash, mut frame_gap, mut frame_dash2, mut frame_gap2) = (0, 0, 0, 0);
+            
+            if let Some(thickness)= footer_frame.get("thickness").and_then(|v| Some(v.as_f64().unwrap_or(0.0) as f32)){
+                frame_thickness = thickness;
+            }
+            
+            if let Some(color) = footer_frame.get("color"){
+                frame_color = get_color(color);
+            }
+            
+            (frame_dash, frame_gap, frame_dash2, frame_gap2) = get_dashes(footer_frame);
+            
+            let line = style::LineStyle::new().with_thickness(frame_thickness)
+                                                .with_color(frame_color)
+                                                .with_dash(frame_dash).with_dash2(frame_dash2)
+                                                .with_gap(frame_gap).with_gap2(frame_gap2);
+            doc.set_footer_frame_line_style(line);
+        }  
+        
        //Enabling hyphenation helps with word wrapping, but not all words. This needs to be improved.
         use hyphenation::Load;
 
