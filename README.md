@@ -153,6 +153,7 @@ config:
     "header_frame": line_style,
     "footer_frame": line_style,
     "page_frame": line_style,
+    "page_frame_width_offset": float, -> A negative value reduces the width
     "deafault_font_size": int,
     "skip_warning_overflowed": bool -> Skip the page size exceeded warning when the paragraph exceeds the layout
 }
