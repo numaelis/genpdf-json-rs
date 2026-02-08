@@ -648,6 +648,11 @@ impl GenpdfJson {
             doc.set_footer_frame_line_style(line);
         }  
         
+        // add page frame width offset, A negative value reduces the width
+        if let Some(page_frame_width_offset) = json_config.get("page_frame_width_offset").and_then(|v| Some(v.as_f64().unwrap_or(0.0) as f32)){
+            doc.set_page_frame_width_offset(page_frame_width_offset);
+        }
+        
        //Enabling hyphenation helps with word wrapping, but not all words. This needs to be improved.
         use hyphenation::Load;
 

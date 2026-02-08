@@ -1,9 +1,10 @@
 # v0.1.14 (2026-02-05)
-- Add page frame, footer frame and header frame. with line style.
+- Add page frame, footer frame and header frame, with line style.
   To activate, add to the config:
   "header_frame": line_style
   "footer_frame": line_style
   "page_frame": line_style
+- Also, page frame width offset; negative values ​​reduce
 
 # v0.1.13 (2025-12-18)
 - allow assigning the `line_spacing` of each style to the element. This would allow for different elements with their respective line spacing.
