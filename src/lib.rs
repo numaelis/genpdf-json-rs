@@ -1,10 +1,10 @@
-use rckive_genpdf::{
+use numaelis_rckive_genpdf::{
     elements, fonts, style, PaperSize, Margins, Alignment, Element, Position, elements::{Paragraph, IntoBoxedElement, Text, PaddedElement, TableLayout, FrameCellDecorator, LinearLayout, OrderedList, UnorderedList, BulletPoint, Break, PageBreak},
 };
 
-use rckive_genpdf::fonts::{FontFamily, Font, FontData};
+use numaelis_rckive_genpdf::fonts::{FontFamily, Font, FontData};
 
-use rckive_genpdf::error::{Error};
+use numaelis_rckive_genpdf::error::{Error};
 use std::path;
 use std::fs;
 
@@ -13,10 +13,10 @@ use std::{collections::HashMap};
 
 use rusqlite::{params, Connection, Result};
 
-type PdfDocument = rckive_genpdf::Document;
+type PdfDocument = numaelis_rckive_genpdf::Document;
 
 struct GenpdfJson {
-    doc: rckive_genpdf::Document,
+    doc: numaelis_rckive_genpdf::Document,
     alignment_map: HashMap<String, Alignment>,    
     font_cache: HashMap<String, FontFamily<Font>>,
     db_path: String,
@@ -249,7 +249,7 @@ fn get_head_style(val_style: &serde_json::Value, font_cache: &HashMap<String, Fo
     return mstyle;
 }
 
-fn get_frame<U: rckive_genpdf::Element + 'static>(
+fn get_frame<U: numaelis_rckive_genpdf::Element + 'static>(
                         element: U, 
                         frame_thickness: f32, frame_color: style::Color, frame_dash: i64, 
                         frame_gap: i64, frame_dash2: i64, frame_gap2: i64, ftop: bool, fright: bool, 
@@ -307,7 +307,7 @@ impl GenpdfJson {
         }
         doc.set_line_spacing(config_line_spacing);  
         
-        let mut decorator = rckive_genpdf::SimplePageDecorator::new();
+        let mut decorator = numaelis_rckive_genpdf::SimplePageDecorator::new();
         let mut _top_margin = 0.0;
         let mut _bottom_margin = 0.0;
         let mut _left_margin = 0.0;
@@ -450,7 +450,7 @@ impl GenpdfJson {
             if page_size.len()>=2 {
                 let width = page_size[0].as_f64().unwrap_or(0.0) as f32;
                 let height = page_size[1].as_f64().unwrap_or(0.0) as f32;
-                doc.set_paper_size(rckive_genpdf::Size::new(width, height));
+                doc.set_paper_size(numaelis_rckive_genpdf::Size::new(width, height));
                 _height = height.clone();
                 _widht = width.clone();
             }            
@@ -554,14 +554,14 @@ impl GenpdfJson {
             
             let mut layout_in = elements::LinearLayout::vertical();//.padded(1);
             if count_footer_paragraph > 0 && width_area > 10.0{  
-                let footer_paragraph_0 = footer_paragraph_0.clone().padded(rckive_genpdf::Margins::vh(0.0, 0.1));
+                let footer_paragraph_0 = footer_paragraph_0.clone().padded(numaelis_rckive_genpdf::Margins::vh(0.0, 0.1));
                 layout.push(footer_paragraph_0);
                 if count_footer_paragraph > 1 {
-                    let footer_paragraph_1 = footer_paragraph_1.clone().padded(rckive_genpdf::Margins::vh(0.0, 0.1));
+                    let footer_paragraph_1 = footer_paragraph_1.clone().padded(numaelis_rckive_genpdf::Margins::vh(0.0, 0.1));
                     layout.push(footer_paragraph_1);
                 }
                 if count_footer_paragraph > 2 {
-                    let footer_paragraph_2 = footer_paragraph_2.clone().padded(rckive_genpdf::Margins::vh(0.0, 0.1));
+                    let footer_paragraph_2 = footer_paragraph_2.clone().padded(numaelis_rckive_genpdf::Margins::vh(0.0, 0.1));
                     layout.push(footer_paragraph_2);
                 }
                 layout.push(elements::Break::new(1.));
@@ -827,7 +827,7 @@ impl GenpdfJson {
     }
     
     ///function to simplify the matching of root layouts 
-    fn match_root_layout<T: RootLayout, U: rckive_genpdf::Element + 'static>(&mut self,
+    fn match_root_layout<T: RootLayout, U: numaelis_rckive_genpdf::Element + 'static>(&mut self,
                                                                              root_layout: &mut T,
                                                                              element:U) -> Result<(), Box<dyn std::error::Error>>{
         match root_layout.type_name(){
@@ -850,7 +850,7 @@ impl GenpdfJson {
         Ok(())
     }
     
-    fn match_text_paragraph<T: RootLayout, U: rckive_genpdf::Element + 'static>(&mut self,  element:U, root_layout: &mut T, 
+    fn match_text_paragraph<T: RootLayout, U: numaelis_rckive_genpdf::Element + 'static>(&mut self,  element:U, root_layout: &mut T, 
                                                                                 has_frame: bool, frame_thickness: f32, 
                                                                                 frame_color: style::Color, frame_dash: i64, 
                                                                                 frame_gap: i64, frame_dash2: i64, frame_gap2: i64,
@@ -1241,9 +1241,9 @@ impl GenpdfJson {
                         }
                         if path != "".to_string() || base64 != "".to_string() {
                             let mut image = if path != "".to_string() {
-                                rckive_genpdf::elements::Image::from_path(path).expect("Unable to load image")
+                                numaelis_rckive_genpdf::elements::Image::from_path(path).expect("Unable to load image")
                             }else{
-                                rckive_genpdf::elements::Image::from_base64(&base64).expect("Unable to load image")
+                                numaelis_rckive_genpdf::elements::Image::from_base64(&base64).expect("Unable to load image")
                             };
                             
                             if let Some(str_alignment) = item_obj.get("alignment").and_then(|v| v.as_str()) {
@@ -1255,7 +1255,7 @@ impl GenpdfJson {
                                     if position.len() >= 2 {
                                         let posx = position[0].as_f64().unwrap_or(0.0) as f32;
                                         let posy = position[1].as_f64().unwrap_or(0.0) as f32;
-                                        image.set_position(rckive_genpdf::Position::new(posx, posy));
+                                        image.set_position(numaelis_rckive_genpdf::Position::new(posx, posy));
                                     }
                             }
                             if let Some(rotation) = item_obj.get("rotation").and_then(|v| Some(v.as_f64().unwrap_or(0.0) as f32)) {
@@ -1268,11 +1268,11 @@ impl GenpdfJson {
                                 if scale.len()>=2{
                                     let s1 = scale[0].as_f64().unwrap_or(0.0) as f32;
                                     let s2 = scale[1].as_f64().unwrap_or(0.0) as f32;
-                                    image.set_scale(rckive_genpdf::Scale::new(s1,s2));
+                                    image.set_scale(numaelis_rckive_genpdf::Scale::new(s1,s2));
                                 }
                             }else{
                                 if let Some(scale) = item_obj.get("scale").and_then(|v| Some(v.as_f64().unwrap_or(0.0) as f32)) {                            
-                                    image.set_scale(rckive_genpdf::Scale::new(scale,scale));
+                                    image.set_scale(numaelis_rckive_genpdf::Scale::new(scale,scale));
                                 }
                             }
                             let mut has_frame = false;
