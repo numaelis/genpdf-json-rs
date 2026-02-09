@@ -13,8 +13,9 @@ license = "GPL3"
 
 [dependencies]
 #support json rckive-genpdf-rs -> https://github.com/numaelis/rckive-genpdf-rs.git
-rckive-genpdf = {version = "0.4.5", git = "https://github.com/numaelis/rckive-genpdf-rs.git", features = ["images", "hyphenation"]}
-# rckive-genpdf = {version = "0.4.5", path = "rckive-genpdf/", features = ["images", "hyphenation"]}
+# numaelis-rckive-genpdf = {version = "0.4.5", git = "https://github.com/numaelis/rckive-genpdf-rs.git", features = ["images", "hyphenation"]}
+# numaelis-rckive-genpdf = {version = "0.4.5", path = "rckive-genpdf/", features = ["images", "hyphenation"]}
+numaelis-rckive-genpdf = {version = "0.4.5", features = ["images", "hyphenation"]}
 image = "0.25"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
