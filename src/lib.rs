@@ -249,6 +249,103 @@ fn get_head_style(val_style: &serde_json::Value, font_cache: &HashMap<String, Fo
     return mstyle;
 }
 
+fn get_paddings(item_obj: &serde_json::Value) -> Vec<f32> {
+        let mut paddings: Vec<f32> = vec![0.1,0.1,0.1,0.1];
+        if let Some(padding) = item_obj.get("padding").and_then(|v| v.as_array()) {
+            if padding.len()>=4{
+                let t = padding[0].as_f64().unwrap_or(0.0) as f32;
+                let r = padding[1].as_f64().unwrap_or(0.0) as f32;
+                let b = padding[2].as_f64().unwrap_or(0.0) as f32;
+                let l = padding[3].as_f64().unwrap_or(0.0) as f32;
+                paddings.clear();
+                paddings.push(t);
+                paddings.push(r);
+                paddings.push(b);
+                paddings.push(l);                                                                    
+            }
+        }else{
+            if let Some(one_padding) = item_obj.get("padding").and_then(|v| Some(v.as_f64().unwrap_or(0.0) as f32)) {                            
+                    paddings.clear();
+                    paddings.push(one_padding);
+                    paddings.push(one_padding);
+                    paddings.push(one_padding);
+                    paddings.push(one_padding);                                                                                                
+            }
+        }
+        paddings
+    }
+
+fn get_image(item_obj: &serde_json::Value, alignment_map: &HashMap<String, Alignment>) -> numaelis_rckive_genpdf::elements::Image {
+    let path : String = if let Some(path) = item_obj.get("path").and_then(|v| v.as_str()) {
+        path.to_string()
+    }else{
+        String::new()
+    };
+    let base64 : String = if let Some(base64) = item_obj.get("base64").and_then(|v| v.as_str()) {
+        base64.to_string()
+    }else{
+        String::new()
+    };
+    let mut image = if path != "".to_string() {
+        numaelis_rckive_genpdf::elements::Image::from_path(path).expect("Unable to load image")
+    }else{
+        numaelis_rckive_genpdf::elements::Image::from_base64(&base64).expect("Unable to load image")
+    };
+    
+    if let Some(str_alignment) = item_obj.get("alignment").and_then(|v| v.as_str()) {
+        if let Some(alignment) = alignment_map.get(str_alignment) { 
+            image.set_alignment(*alignment);
+        }
+    }
+    if let Some(position) = item_obj.get("position").and_then(|v| v.as_array()) {
+            if position.len() >= 2 {
+                let posx = position[0].as_f64().unwrap_or(0.0) as f32;
+                let posy = position[1].as_f64().unwrap_or(0.0) as f32;
+                image.set_position(numaelis_rckive_genpdf::Position::new(posx, posy));
+            }
+    }
+    if let Some(rotation) = item_obj.get("rotation").and_then(|v| Some(v.as_f64().unwrap_or(0.0) as f32)) {
+        image.set_clockwise_rotation(rotation);
+    }
+    if let Some(dpi) = item_obj.get("dpi").and_then(|v| Some(v.as_f64().unwrap_or(0.0) as f32)) {
+        image.set_dpi(dpi);
+    }
+    if let Some(scale) = item_obj.get("scale").and_then(|v| v.as_array()) {
+        if scale.len()>=2{
+            let s1 = scale[0].as_f64().unwrap_or(0.0) as f32;
+            let s2 = scale[1].as_f64().unwrap_or(0.0) as f32;
+            image.set_scale(numaelis_rckive_genpdf::Scale::new(s1,s2));
+        }
+    }else{
+        if let Some(scale) = item_obj.get("scale").and_then(|v| Some(v.as_f64().unwrap_or(0.0) as f32)) {                            
+            image.set_scale(numaelis_rckive_genpdf::Scale::new(scale,scale));
+        }
+    }
+    if let Some(source_frame) = item_obj.get("source_frame").and_then(|v| v.as_object()) {                                
+        let mut frame_thickness = 0.1;
+        let mut frame_color = style::Color::Rgb(0,0,0);
+        let (mut frame_dash, mut frame_gap, mut frame_dash2, mut frame_gap2) = (0, 0, 0, 0);
+        
+        if let Some(thickness)= source_frame.get("thickness").and_then(|v| Some(v.as_f64().unwrap_or(0.0) as f32)){
+            frame_thickness = thickness;
+        }                                
+        if let Some(color) = source_frame.get("color"){
+            frame_color = get_color(color);
+        }                                
+        (frame_dash, frame_gap, frame_dash2, frame_gap2) = get_dashes(source_frame);
+        
+        let line_style = style::LineStyle::new().with_thickness(frame_thickness)
+                                            .with_color(frame_color)
+                                            .with_dash(frame_dash).with_dash2(frame_dash2)
+                                            .with_gap(frame_gap).with_gap2(frame_gap2);
+        image.set_source_frame(line_style);
+    }
+    if let Some(source_frame_offset) = item_obj.get("source_frame_offset").and_then(|v| Some(v.as_f64().unwrap_or(0.0) as f32)) {                            
+        image.set_source_frame_offset(source_frame_offset);
+    }    
+    image
+}
+
 fn get_frame<U: numaelis_rckive_genpdf::Element + 'static>(
                         element: U, 
                         frame_thickness: f32, frame_color: style::Color, frame_dash: i64, 
@@ -414,24 +511,93 @@ impl GenpdfJson {
         if let Some(deafault_font_size) = json_config.get("deafault_font_size").and_then(|v| Some(v.as_f64().unwrap_or(9.0) as u8)) { 
             font_size = deafault_font_size;
         }
+        
+        let mut left_logo: serde_json::Value = serde_json::json!({});
+        let mut right_logo: serde_json::Value = serde_json::json!({});
+        
+        let mut header_column_weights = vec![1];
+        if let Some(header_logo) = json_config.get("header_logo") {
+            if let Some(llogo) = header_logo.get("left"){
+                if let Some(type_) = llogo.get("type").and_then(|v| v.as_str()) {  
+                    if type_ == "image" {
+                        left_logo = llogo.clone();                        
+                        header_column_weights.push(1);
+                    }
+                }
+            }       
+            if let Some(rlogo) = header_logo.get("right"){
+                if let Some(type_) = rlogo.get("type").and_then(|v| v.as_str()) {  
+                    if type_ == "image" {
+                        right_logo = rlogo.clone();                        
+                        header_column_weights.push(1);
+                    }
+                }
+            }   
+        }
                 
-        decorator.set_header( move |page|{
+        if let Some(column_weights) = json_config.get("header_column_weights").and_then(|v| v.as_array()) {
+            if column_weights.len() > 0 {                                        
+                let usize_values: Vec<usize> = column_weights
+                    .into_iter()
+                    .filter_map(|val| {
+                        if let serde_json::Value::Number(num) = val {
+                            num.as_u64().and_then(|n| Some(n as usize))
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+                if usize_values.len() == header_column_weights.len(){
+                    header_column_weights = usize_values;
+                }
+            }
+        }
+        let mut alignment_map2 = HashMap::new();
+        alignment_map2.insert("center".to_string(), Alignment::Center);
+        alignment_map2.insert("left".to_string(), Alignment::Left);
+        alignment_map2.insert("right".to_string(), Alignment::Right);    
             
-            let mut layout = elements::LinearLayout::vertical();
-            
+        decorator.set_header( move |page|{            
+            let mut layout = elements::LinearLayout::vertical();            
+            let mut table = elements::TableLayout::new(header_column_weights.clone());
+            table.set_cell_decorator(elements::FrameCellDecorator::new(false, false, false));
+            let mut row = table.row();
+            if left_logo != serde_json::json!({}){
+                let logo_0 = get_image(&left_logo, &alignment_map2);
+                let paddings = get_paddings(&left_logo);                        
+                let logo_0 = PaddedElement::new(
+                    logo_0,
+                    Margins::trbl(paddings[0], paddings[1], paddings[2], paddings[3]),
+                );
+                row.push_element(logo_0);
+            }
+            let mut layout_p = elements::LinearLayout::vertical();
             if count_head_paragraph > 0 {  
-                let head_paragraph_0 = head_paragraph_0.clone();
-                layout.push(head_paragraph_0);
+                let head_paragraph_0 = head_paragraph_0.clone().padded(Margins::vh(0.0, 0.5));
+                layout_p.push(head_paragraph_0);
                 if count_head_paragraph > 1 {
-                    let head_paragraph_1 = head_paragraph_1.clone();
-                    layout.push(head_paragraph_1);
+                    let head_paragraph_1 = head_paragraph_1.clone().padded(Margins::vh(0.0, 0.5));
+                    layout_p.push(head_paragraph_1);
                 }
                 if count_head_paragraph > 2 {
-                    let head_paragraph_2 = head_paragraph_2.clone();
-                    layout.push(head_paragraph_2);
+                    let head_paragraph_2 = head_paragraph_2.clone().padded(Margins::vh(0.0, 0.5));
+                    layout_p.push(head_paragraph_2);
                 }
-                layout.push(elements::Break::new(0.6));
+                layout_p.push(elements::Break::new(0.6));
             }
+            row.push_element(layout_p);
+            if right_logo != serde_json::json!({}){
+                let logo_1 = get_image(&right_logo, &alignment_map2);
+                let paddings = get_paddings(&right_logo);                        
+                let logo_1 = PaddedElement::new(
+                    logo_1,
+                    Margins::trbl(paddings[0], paddings[1], paddings[2], paddings[3]),
+                );
+                row.push_element(logo_1);
+            }
+            let _ = row.push();
+            layout.push(table);
+            
             if page > 1 && page_count_text!= "".to_string()  {
                 layout.push(
                     elements::Paragraph::new(format!("{} {}",page_count_text, page)).aligned(page_count_alignment).styled(page_count_style),
@@ -474,6 +640,61 @@ impl GenpdfJson {
                     }
                     _ =>{
                     }
+                }
+            }
+        }
+        
+        // footer logo
+        let mut footer_left_logo: serde_json::Value = serde_json::json!({});
+        let mut footer_right_logo: serde_json::Value = serde_json::json!({});        
+        let mut footer_column_weights = vec![1];
+        let mut footer_left_height = 0.0;
+        let mut footer_right_height = 0.0;
+        if let Some(footer_logo) = json_config.get("footer_logo") {
+            if let Some(llogo) = footer_logo.get("left"){
+                if let Some(type_) = llogo.get("type").and_then(|v| v.as_str()) {  
+                    if type_ == "image" {
+                        footer_left_logo = llogo.clone();                        
+                        footer_column_weights.push(1);
+                        
+                        //calculate size before                        
+                        footer_left_height = get_image(&llogo, &alignment_map).get_size().height.into();
+                        let paddings = get_paddings(&llogo);
+                        footer_left_height += paddings[0];
+                        footer_left_height += paddings[2];
+                    }
+                }
+            }       
+            if let Some(rlogo) = footer_logo.get("right"){
+                if let Some(type_) = rlogo.get("type").and_then(|v| v.as_str()) {  
+                    if type_ == "image" {
+                        footer_right_logo = rlogo.clone();                        
+                        footer_column_weights.push(1);
+                        
+                        //calculate size before
+                        footer_right_height = get_image(&rlogo, &alignment_map).get_size().height.into();
+                        let paddings = get_paddings(&rlogo);
+                        footer_right_height += paddings[0];
+                        footer_right_height += paddings[2];
+                    }
+                }
+            }   
+        }
+                
+        if let Some(column_weights) = json_config.get("footer_column_weights").and_then(|v| v.as_array()) {
+            if column_weights.len() > 0 {                                        
+                let usize_values: Vec<usize> = column_weights
+                    .into_iter()
+                    .filter_map(|val| {
+                        if let serde_json::Value::Number(num) = val {
+                            num.as_u64().and_then(|n| Some(n as usize))
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+                if usize_values.len() == footer_column_weights.len(){
+                    footer_column_weights = usize_values;
                 }
             }
         }
@@ -525,26 +746,40 @@ impl GenpdfJson {
                 count_footer_paragraph +=1;
             }
         }        
-        let width_area =  _widht - _left_margin - _right_margin;                
-        if count_footer_paragraph > 0 {  
-            let line_off = config_line_spacing.clone();
-            let mut hei0 = footer_paragraph_0.get_height(doc.context(), width_area);
-            
+        let width_area =  _widht - _left_margin - _right_margin;   
+        let mut footer_height:f32 = 0.0;        
+        if count_footer_paragraph > 0 {              
+            let mut hei0 = footer_paragraph_0.get_height(doc.context(), width_area);            
             if count_footer_paragraph > 1 {
                 hei0 += footer_paragraph_1.get_height(doc.context(), width_area);   
-                // line_off += config_line_spacing.clone();
             }
             if count_footer_paragraph > 2 {
                 hei0 += footer_paragraph_2.get_height(doc.context(), width_area);
-            }
-            let hei0: f32 = hei0.into();
-            y -= hei0;
-                        
-            let off_bottom_margin = hei0.clone() - line_off;
+            }            
+            footer_height = hei0.into();  
+            // add the Break 1.
+            footer_height += 1.;    
+        }
+        
+        if footer_left_height > footer_height {
+            footer_height = footer_left_height;
+        }
+        if footer_right_height > footer_height {
+            footer_height = footer_right_height;
+        }
+        if footer_height > 0.0 {
+            y -= footer_height;
+            let off_bottom_margin = footer_height.clone();
             decorator.set_margins(Margins::trbl(_top_margin, _right_margin, _bottom_margin + off_bottom_margin, _left_margin));
             //save rec footer
-            doc.set_rec_footer(Position::new(x,y + line_off), Position::new(width_area, off_bottom_margin));
+            doc.set_rec_footer(Position::new(x,y), Position::new(width_area, off_bottom_margin));
         }
+        
+        
+        let mut alignment_map3 = HashMap::new();
+        alignment_map3.insert("center".to_string(), Alignment::Center);
+        alignment_map3.insert("left".to_string(), Alignment::Left);
+        alignment_map3.insert("right".to_string(), Alignment::Right); 
         
         decorator.set_footer( move |page|{     
             
@@ -552,19 +787,32 @@ impl GenpdfJson {
             
             layout.set_orphan_position(x, y);
             
-            let mut layout_in = elements::LinearLayout::vertical();//.padded(1);
+            let mut table = elements::TableLayout::new(footer_column_weights.clone());
+            table.set_cell_decorator(elements::FrameCellDecorator::new(false, false, false));
+            let mut row = table.row();
+            if footer_left_logo != serde_json::json!({}){
+                let logo_0 = get_image(&footer_left_logo, &alignment_map3);
+                let paddings = get_paddings(&footer_left_logo);                        
+                let logo_0 = PaddedElement::new(
+                    logo_0,
+                    Margins::trbl(paddings[0], paddings[1], paddings[2], paddings[3]),
+                );
+                row.push_element(logo_0);
+            }
+            let mut layout_p = elements::LinearLayout::vertical();
+                        
             if count_footer_paragraph > 0 && width_area > 10.0{  
-                let footer_paragraph_0 = footer_paragraph_0.clone().padded(numaelis_rckive_genpdf::Margins::vh(0.0, 0.1));
-                layout.push(footer_paragraph_0);
+                let footer_paragraph_0 = footer_paragraph_0.clone().padded(Margins::vh(0.0, 0.5));
+                layout_p.push(footer_paragraph_0);
                 if count_footer_paragraph > 1 {
-                    let footer_paragraph_1 = footer_paragraph_1.clone().padded(numaelis_rckive_genpdf::Margins::vh(0.0, 0.1));
-                    layout.push(footer_paragraph_1);
+                    let footer_paragraph_1 = footer_paragraph_1.clone().padded(Margins::vh(0.0, 0.5));
+                    layout_p.push(footer_paragraph_1);
                 }
                 if count_footer_paragraph > 2 {
-                    let footer_paragraph_2 = footer_paragraph_2.clone().padded(numaelis_rckive_genpdf::Margins::vh(0.0, 0.1));
-                    layout.push(footer_paragraph_2);
+                    let footer_paragraph_2 = footer_paragraph_2.clone().padded(Margins::vh(0.0, 0.5));
+                    layout_p.push(footer_paragraph_2);
                 }
-                layout.push(elements::Break::new(1.));
+                layout_p.push(elements::Break::new(1.));
             }
             // TODO page count in footer
             // if page > 1 && page_count_text!= "".to_string()  {
@@ -573,8 +821,19 @@ impl GenpdfJson {
             //     );
             //     layout.push(elements::Break::new(1.));
             // }
+            row.push_element(layout_p);
+            if footer_right_logo != serde_json::json!({}){
+                let logo_1 = get_image(&footer_right_logo, &alignment_map3);
+                let paddings = get_paddings(&footer_right_logo);                        
+                let logo_1 = PaddedElement::new(
+                    logo_1,
+                    Margins::trbl(paddings[0], paddings[1], paddings[2], paddings[3]),
+                );
+                row.push_element(logo_1);
+            }
+            let _ = row.push();
+            layout.push(table);
             layout.styled(style::Style::new())
-            // layout.push(layout_in)
         });
         
         doc.set_page_decorator(decorator);
@@ -1274,6 +1533,28 @@ impl GenpdfJson {
                                 if let Some(scale) = item_obj.get("scale").and_then(|v| Some(v.as_f64().unwrap_or(0.0) as f32)) {                            
                                     image.set_scale(numaelis_rckive_genpdf::Scale::new(scale,scale));
                                 }
+                            }
+                            if let Some(source_frame) = item_obj.get("source_frame").and_then(|v| v.as_object()) {                                
+                                let mut frame_thickness = 0.1;
+                                let mut frame_color = style::Color::Rgb(0,0,0);
+                                let (mut frame_dash, mut frame_gap, mut frame_dash2, mut frame_gap2) = (0, 0, 0, 0);
+                                
+                                if let Some(thickness)= source_frame.get("thickness").and_then(|v| Some(v.as_f64().unwrap_or(0.0) as f32)){
+                                    frame_thickness = thickness;
+                                }                                
+                                if let Some(color) = source_frame.get("color"){
+                                    frame_color = get_color(color);
+                                }                                
+                                (frame_dash, frame_gap, frame_dash2, frame_gap2) = get_dashes(source_frame);
+                                
+                                let line_style = style::LineStyle::new().with_thickness(frame_thickness)
+                                                                    .with_color(frame_color)
+                                                                    .with_dash(frame_dash).with_dash2(frame_dash2)
+                                                                    .with_gap(frame_gap).with_gap2(frame_gap2);
+                                image.set_source_frame(line_style);
+                            }
+                            if let Some(source_frame_offset) = item_obj.get("source_frame_offset").and_then(|v| Some(v.as_f64().unwrap_or(0.0) as f32)) {                            
+                                image.set_source_frame_offset(source_frame_offset);
                             }
                             let mut has_frame = false;
                             let mut frame_thickness = 0.1;

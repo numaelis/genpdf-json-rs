@@ -154,6 +154,10 @@ config:
     "footer_frame": line_style,
     "page_frame": line_style,
     "page_frame_width_offset": float, -> A negative value reduces the width
+    "header_logo" : {"left": image, "right": image}, omit what is not used
+    "footer_logo" : {"left": image, "right": image}, omit what is not used
+    "header_column_weights": [1,1,1], in case of using all three (image, paragraphs, image)
+    "footer_column_weights": [1,1,1], default 1
     "deafault_font_size": int,
     "skip_warning_overflowed": bool -> Skip the page size exceeded warning when the paragraph exceeds the layout
 }
@@ -169,7 +173,6 @@ line_style:
     "background": bool, (only frame)
     "background_color": color, (only frame)
  }
- 
 ```
 
 margins:
@@ -237,7 +240,7 @@ elements
     "frame": line_style,
     "style": style,
     "padding": margins,
-    "elements": [...elements column_weights.len()...] -> 
+    "elements": [...elements column_weights.len()...]
  }
  
  {
@@ -247,7 +250,7 @@ elements
     "frame": line_style,
     "style": style,
     "padding": margins,
-    "rows": [...rows column_weights.len()...] -> 
+    "rows": [...rows column_weights.len()...]
  }
  
  {
@@ -255,7 +258,7 @@ elements
     "frame": line_style,
     "style": style,
     "padding": margins,
-    "elements": [...elements...]
+    "elements": [...elements...],
     "bullet": string
  }
  
@@ -264,7 +267,7 @@ elements
     "frame": line_style,
     "style": style,
     "padding": margins,
-    "elements": [...elements...]
+    "elements": [...elements...],
     "start": int
  }
  
@@ -291,11 +294,13 @@ elements
     "base64": string,
     "frame": line_style,    
     "padding": margins,    
-    "alignment" alignment
+    "alignment": alignment,
     "position": [float, float],
     "scale": float,
-    "rotation", float  +-
-    "dpi": float    
+    "rotation": float,  +-
+    "dpi": float,
+    "source_frame": line_style,
+    "source_frame_offset": float, Negative decrements
  }
  
  {
