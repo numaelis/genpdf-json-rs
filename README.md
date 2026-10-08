@@ -172,6 +172,7 @@ line_style:
     "top": bool, "right": bool, "bottom": bool, "left": bool (only frame),
     "background": bool, (only frame)
     "background_color": color, (only frame)
+    "border_radius": float, (only frame)
  }
 ```
 

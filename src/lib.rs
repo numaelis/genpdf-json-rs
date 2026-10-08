@@ -649,7 +649,7 @@ impl GenpdfJson {
         let mut footer_right_logo: serde_json::Value = serde_json::json!({});        
         let mut footer_column_weights = vec![1];
         let mut footer_left_height = 0.0;
-        let mut footer_right_height = 0.0;
+        let mut footer_right_height = 0.0;        
         if let Some(footer_logo) = json_config.get("footer_logo") {
             if let Some(llogo) = footer_logo.get("left"){
                 if let Some(type_) = llogo.get("type").and_then(|v| v.as_str()) {  
@@ -745,8 +745,14 @@ impl GenpdfJson {
                 }
                 count_footer_paragraph +=1;
             }
+        }
+        //Calculate the available width for the logos
+        let proportion = footer_column_weights.iter().sum::<usize>() as f32;
+        let mut width_proportion_logo = 0.0;
+        if footer_column_weights.len() == 2 ||  footer_column_weights.len() == 3 {            
+            width_proportion_logo = (proportion - footer_column_weights[1] as f32) * _widht / proportion
         }        
-        let width_area =  _widht - _left_margin - _right_margin;   
+        let width_area =  _widht - _left_margin - _right_margin - width_proportion_logo;
         let mut footer_height:f32 = 0.0;        
         if count_footer_paragraph > 0 {              
             let mut hei0 = footer_paragraph_0.get_height(doc.context(), width_area);            
@@ -774,7 +780,6 @@ impl GenpdfJson {
             //save rec footer
             doc.set_rec_footer(Position::new(x,y), Position::new(width_area, off_bottom_margin));
         }
-        
         
         let mut alignment_map3 = HashMap::new();
         alignment_map3.insert("center".to_string(), Alignment::Center);
@@ -884,7 +889,7 @@ impl GenpdfJson {
             doc.set_header_frame_line_style(line);
         }  
         
-        // add header frame
+        // add footer frame
         if let Some(footer_frame) = json_config.get("footer_frame").and_then(|v| v.as_object()) {
             let mut frame_thickness = 0.1;
             let mut frame_color = style::Color::Rgb(0,0,0);
@@ -1115,21 +1120,27 @@ impl GenpdfJson {
                                                                                 frame_gap: i64, frame_dash2: i64, frame_gap2: i64,
                                                                                 ftop: bool, fright: bool, fbottom: bool, fleft: bool,
                                                                                 has_background: bool, background_color: style::Color,
-                                                                                bullet: &str) -> Result<(), Box<dyn std::error::Error>> {
+                                                                                bullet: &str, border_radius: f32) -> Result<(), Box<dyn std::error::Error>> {
                                                                                     
         
         if bullet != "" {
             if has_frame{                        
-                let nlayout = get_frame(element, frame_thickness, frame_color, frame_dash, frame_gap, frame_dash2, frame_gap2,
-                                        ftop, fright, fbottom, fleft, has_background, background_color);                                        
+                let mut nlayout = get_frame(element, frame_thickness, frame_color, frame_dash, frame_gap, frame_dash2, frame_gap2,
+                                        ftop, fright, fbottom, fleft, has_background, background_color);
+                if border_radius > 0.0 {
+                    nlayout.set_border_radius(border_radius);
+                }
                 let _ = self.match_root_layout(root_layout, BulletPoint::new(nlayout).with_bullet(bullet))?;
             }else{
                 let _ = self.match_root_layout(root_layout, BulletPoint::new(element).with_bullet(bullet))?;
             }                                                                        
         }else{
             if has_frame{
-                let nlayout = get_frame(element, frame_thickness, frame_color, frame_dash, frame_gap, frame_dash2, frame_gap2,
+                let mut nlayout = get_frame(element, frame_thickness, frame_color, frame_dash, frame_gap, frame_dash2, frame_gap2,
                                         ftop, fright, fbottom, fleft, has_background, background_color);
+                if border_radius > 0.0 {
+                    nlayout.set_border_radius(border_radius);
+                }
                 let _ = self.match_root_layout(root_layout, nlayout)?;                                                  
             }else{
                 let _ = self.match_root_layout(root_layout, element)?;
@@ -1174,6 +1185,7 @@ impl GenpdfJson {
                                 let (mut frame_dash, mut frame_gap, mut frame_dash2, mut frame_gap2) = (0, 0, 0, 0);
                                 let (mut ftop, mut fright, mut fbottom, mut fleft) = (true, true, true, true);
                                 let (mut has_background, mut background_color) = (false, style::Color::Rgb(255,255,255));
+                                let mut border_radius = 0.0;
                                 if let Some(frame) = item_obj.get("frame").and_then(|v| v.as_object()) {
                                     if let Some(thickness)= frame.get("thickness").and_then(|v| Some(v.as_f64().unwrap_or(0.0) as f32)){
                                         frame_thickness = thickness;
@@ -1190,17 +1202,23 @@ impl GenpdfJson {
                                         if let Some(b_color) = frame.get("background_color"){
                                             background_color = get_background_color(b_color);
                                         }  
-                                    }  
+                                    }
+                                    if let Some(radius) = frame.get("border_radius").and_then(|v| Some(v.as_f64().unwrap_or(0.0) as f32)){
+                                        border_radius = radius;
+                                    }
                                 }
                                 let nlayout = layout.root.styled(mstyle);
-                                let paddings = self.get_paddings(item_obj);                        
+                                let paddings = self.get_paddings(item_obj);
                                 let nlayout = PaddedElement::new(
                                     nlayout,
                                     Margins::trbl(paddings[0], paddings[1], paddings[2], paddings[3]),
                                 ); 
                                 if has_frame{
-                                    let nlayout = get_frame(nlayout, frame_thickness, frame_color, frame_dash, frame_gap, frame_dash2, frame_gap2,
-                                        ftop, fright, fbottom, fleft, has_background, background_color); 
+                                    let mut nlayout = get_frame(nlayout, frame_thickness, frame_color, frame_dash, frame_gap, frame_dash2, frame_gap2,
+                                        ftop, fright, fbottom, fleft, has_background, background_color);
+                                    if border_radius > 0.0 {
+                                        nlayout.set_border_radius(border_radius);
+                                    }
                                     let _ = self.match_root_layout(root_layout, nlayout)?;                                     
                                 }else{
                                     let _ = self.match_root_layout(root_layout, nlayout)?;
@@ -1381,6 +1399,7 @@ impl GenpdfJson {
                         let (mut frame_dash, mut frame_gap, mut frame_dash2, mut frame_gap2) = (0, 0, 0, 0);
                         let (mut ftop, mut fright, mut fbottom, mut fleft) = (true, true, true, true);
                         let (mut has_background, mut background_color) = (false, style::Color::Rgb(255,255,255));
+                        let mut border_radius = 0.0;
                         if let Some(frame) = item_obj.get("frame").and_then(|v| v.as_object()) {
                             if let Some(thickness)= frame.get("thickness").and_then(|v| Some(v.as_f64().unwrap_or(0.0) as f32)){
                                 frame_thickness = thickness;
@@ -1397,7 +1416,9 @@ impl GenpdfJson {
                                     background_color = get_background_color(b_color);
                                 }  
                             }
-                            
+                            if let Some(radius) = frame.get("border_radius").and_then(|v| Some(v.as_f64().unwrap_or(0.0) as f32)){
+                                border_radius = radius;
+                            }
                         }
                         let mut mstyle = style::Style::new();
                         if let Some(style) = item_obj.get("style") {
@@ -1410,8 +1431,11 @@ impl GenpdfJson {
                             Margins::trbl(paddings[0], paddings[1], paddings[2], paddings[3]),
                         );
                         if has_frame{
-                            let nlayout = get_frame(nlayout, frame_thickness, frame_color, frame_dash, frame_gap, frame_dash2, frame_gap2,
-                                        ftop, fright, fbottom, fleft, has_background, background_color);                                  
+                            let mut nlayout = get_frame(nlayout, frame_thickness, frame_color, frame_dash, frame_gap, frame_dash2, frame_gap2,
+                                        ftop, fright, fbottom, fleft, has_background, background_color);
+                            if border_radius > 0.0 {
+                                nlayout.set_border_radius(border_radius);
+                            }
                             let _ = self.match_root_layout(root_layout, nlayout)?; 
                         }else{
                             let _ = self.match_root_layout(root_layout, nlayout)?; 
@@ -1437,6 +1461,7 @@ impl GenpdfJson {
                         let (mut frame_dash, mut frame_gap, mut frame_dash2, mut frame_gap2) = (0, 0, 0, 0);
                         let (mut ftop, mut fright, mut fbottom, mut fleft) = (true, true, true, true);
                         let (mut has_background, mut background_color) = (false, style::Color::Rgb(255,255,255));
+                        let mut border_radius = 0.0;
                         if let Some(frame) = item_obj.get("frame").and_then(|v| v.as_object()) {
                             if let Some(thickness)= frame.get("thickness").and_then(|v| Some(v.as_f64().unwrap_or(0.0) as f32)){
                                 frame_thickness = thickness;
@@ -1453,6 +1478,9 @@ impl GenpdfJson {
                                     background_color = get_background_color(b_color);
                                 }  
                             }
+                            if let Some(radius) = frame.get("border_radius").and_then(|v| Some(v.as_f64().unwrap_or(0.0) as f32)){
+                                border_radius = radius;
+                            }
                         }                        
                         
                         let mut mstyle = style::Style::new();
@@ -1466,8 +1494,11 @@ impl GenpdfJson {
                             Margins::trbl(paddings[0], paddings[1], paddings[2], paddings[3]),
                         );
                         if has_frame{
-                            let nlayout = get_frame(nlayout, frame_thickness, frame_color, frame_dash, frame_gap, frame_dash2, frame_gap2,
-                                        ftop, fright, fbottom, fleft, has_background, background_color);                                    
+                            let mut nlayout = get_frame(nlayout, frame_thickness, frame_color, frame_dash, frame_gap, frame_dash2, frame_gap2,
+                                        ftop, fright, fbottom, fleft, has_background, background_color);
+                            if border_radius > 0.0 {
+                                nlayout.set_border_radius(border_radius);
+                            }
                             let _ = self.match_root_layout(root_layout, nlayout)?;
                         }else{
                             let _ = self.match_root_layout(root_layout, nlayout)?;
@@ -1562,6 +1593,7 @@ impl GenpdfJson {
                             let (mut frame_dash, mut frame_gap, mut frame_dash2, mut frame_gap2) = (0, 0, 0, 0);
                             let (mut ftop, mut fright, mut fbottom, mut fleft) = (true, true, true, true);
                             let (mut has_background, mut background_color) = (false, style::Color::Rgb(255,255,255));
+                            let mut border_radius = 0.0;
                             if let Some(frame) = item_obj.get("frame").and_then(|v| v.as_object()) {
                                 if let Some(thickness)= frame.get("thickness").and_then(|v| Some(v.as_f64().unwrap_or(0.0) as f32)){
                                     frame_thickness = thickness;
@@ -1578,6 +1610,9 @@ impl GenpdfJson {
                                         background_color = get_background_color(b_color);
                                     }  
                                 }
+                                if let Some(radius) = frame.get("border_radius").and_then(|v| Some(v.as_f64().unwrap_or(0.0) as f32)){
+                                    border_radius = radius;
+                                }
                             }
                             let paddings = self.get_paddings(item_obj);                        
                             let image = PaddedElement::new(
@@ -1585,8 +1620,11 @@ impl GenpdfJson {
                                 Margins::trbl(paddings[0], paddings[1], paddings[2], paddings[3]),
                             );
                             if has_frame{
-                                let nlayout = get_frame(image, frame_thickness, frame_color, frame_dash, frame_gap, frame_dash2, frame_gap2,
-                                    ftop, fright, fbottom, fleft, has_background, background_color);                                           
+                                let mut nlayout = get_frame(image, frame_thickness, frame_color, frame_dash, frame_gap, frame_dash2, frame_gap2,
+                                    ftop, fright, fbottom, fleft, has_background, background_color);
+                                if border_radius > 0.0 {
+                                    nlayout.set_border_radius(border_radius);
+                                }
                                 let _ = self.match_root_layout(root_layout, nlayout)?;
                             }else{
                                 let _ = self.match_root_layout(root_layout, image)?;
@@ -1629,6 +1667,7 @@ impl GenpdfJson {
                         let (mut frame_dash, mut frame_gap, mut frame_dash2, mut frame_gap2) = (0, 0, 0, 0);
                         let (mut ftop, mut fright, mut fbottom, mut fleft) = (true, true, true, true);
                         let (mut has_background, mut background_color) = (false, style::Color::Rgb(255,255,255));
+                        let mut border_radius = 0.0;
                         if let Some(frame) = item_obj.get("frame").and_then(|v| v.as_object()) {
                             if let Some(thickness)= frame.get("thickness").and_then(|v| Some(v.as_f64().unwrap_or(0.0) as f32)){
                                 frame_thickness = thickness;
@@ -1645,6 +1684,9 @@ impl GenpdfJson {
                                     background_color = get_background_color(b_color);
                                 }  
                             }
+                            if let Some(radius) = frame.get("border_radius").and_then(|v| Some(v.as_f64().unwrap_or(0.0) as f32)){
+                                border_radius = radius;
+                            }
                         }                        
                         let mut bullet = "";
                         if let Some(bullet_point) = item_obj.get("bullet").and_then(|v| v.as_str()) {
@@ -1653,7 +1695,7 @@ impl GenpdfJson {
                         self.match_text_paragraph(element, root_layout, has_frame,
                                                   frame_thickness, frame_color, frame_dash, frame_gap, 
                                                   frame_dash2, frame_gap2, ftop, fright, fbottom, fleft, has_background, background_color,
-                                                  bullet)?;
+                                                  bullet, border_radius)?;
                     }
                         
                     "text" => {
@@ -1686,6 +1728,7 @@ impl GenpdfJson {
                         let (mut frame_dash, mut frame_gap, mut frame_dash2, mut frame_gap2) = (0, 0, 0, 0);
                         let (mut ftop, mut fright, mut fbottom, mut fleft) = (true, true, true, true);
                         let (mut has_background, mut background_color) = (false, style::Color::Rgb(255,255,255));
+                        let mut border_radius = 0.0;
                         if let Some(frame) = item_obj.get("frame").and_then(|v| v.as_object()) {
                             if let Some(thickness)= frame.get("thickness").and_then(|v| Some(v.as_f64().unwrap_or(0.0) as f32)){
                                 frame_thickness = thickness;
@@ -1702,6 +1745,9 @@ impl GenpdfJson {
                                     background_color = get_background_color(b_color);
                                 }  
                             }
+                            if let Some(radius) = frame.get("border_radius").and_then(|v| Some(v.as_f64().unwrap_or(0.0) as f32)){
+                                border_radius = radius;
+                            }
                         }                      
                         let mut bullet = "";
                         if let Some(bullet_point) = item_obj.get("bullet").and_then(|v| v.as_str()) {
@@ -1710,7 +1756,7 @@ impl GenpdfJson {
                         self.match_text_paragraph(element, root_layout, has_frame,
                                                   frame_thickness, frame_color, frame_dash, frame_gap, 
                                                   frame_dash2, frame_gap2, ftop, fright, fbottom, fleft, has_background, background_color,
-                                                  bullet)?;
+                                                  bullet, border_radius)?;
                                               
                     },
                     _ => println!("The JSON does not have the expected type."),                
