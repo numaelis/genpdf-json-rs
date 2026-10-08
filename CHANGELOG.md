@@ -1,3 +1,8 @@
+# 0.1.16 (2026-10-08)
+- Fixing background in the `FramedElement`, the color was added twice, and it turned out darker.
+- Adding border radius in `FramedElement` (including the background): if the border radius exceeds the maximum allowed value, it is set to that maximum.
+- Fixing the text width calculation in the footer by subtracting the logo width.
+
 # v0.1.15 (2026-02-14)
 - Add frame around the image outline.
   To activate add to Image:
